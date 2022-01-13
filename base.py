@@ -89,21 +89,10 @@ class PolygonWindowBase:
         self.window.grab_set()
         self.window.mainloop()
 
-class PolygonConnections:
-    def __init__(self, db, tables = None):
-        self.db = db
-        if tables is None:
-            raise AttributeError("At least one table must be specified")
-        elif not isinstance(tables, list):
-            tables = [tables]
-
-        for table in tables:
-            self.__dict__[table] = TableCon(db = db, table = table,
-                                            debug = c.DEBUG)
-
 polygon_db = MultiConnection(
     r".\data\polygon.db",
-    ["series", "episodes", "titles", "entries", "tags"]
+    ["series", "episodes", "titles", "entries", "tags"],
+    debug = c.DEBUG
     )
 
 # polygon_db.execute("CREATE TABLE series(series_id text not null, name text not null, custom_name text, genres text, notes text, imdb_user_rating double, imdb_user_votes int, rating int, import_date date)")
