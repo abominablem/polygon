@@ -115,3 +115,4 @@ dmypy.json
 *.psd
 *.svg
 *.xlsx
+sql_setup.py

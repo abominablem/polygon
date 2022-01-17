@@ -98,12 +98,6 @@ polygon_db = MultiConnection(
     debug = c.DEBUG
     )
 
-# polygon_db.execute("CREATE TABLE entries(entry_id integer primary key autoincrement, title_id text not null, entry_date date, entry_order int not null, rewatch bool, notes text,  foreign key (title_id) references titles (title_id))")
-# polygon_db.execute("CREATE TABLE "episodes" (	"title_id"	text NOT NULL, "series_id" text NOT NULL, "season" int NOT NULL, "episode" int NOT NULL, FOREIGN KEY("title_id") REFERENCES "titles"("title_id"), FOREIGN KEY("series_id") REFERENCES "series"("series_id"))")
-# polygon_db.execute("CREATE TABLE "series" (	"series_id"	text NOT NULL,	"title"	text NOT NULL,	"custom_name"	text,	"genre"	text,	"plot_tag"	TEXT,	"notes"	text,	"imdb_user_rating"	double,	"imdb_user_votes"	int,	"rating"	int,	"import_date"	date)")
-# polygon_db.execute("CREATE TABLE tags(entry_id int, tag_name text, tag_value text not null,  foreign key (entry_id) references entries (entry_id))")
-# polygon_db.execute("CREATE TABLE "titles" ("title_id"	text NOT NULL,"type"text NOT NULL,"title"text NOT NULL,"original_title"	text,"custom_title"	text,"year"	int,"release_date" date,"director" text, "writer" text, "genre" text, "runtime" int, "plot_tag"	text, "imdb_user_rating" double, "imdb_user_votes" int,	"import_date" date)")
-
 if __name__ == "__main__":
     class TestApp:
         @log_class
