@@ -88,3 +88,7 @@ LBL_STD_ARGS = {
     "font" : FONT_LABEL_BOLD,
     "anchor" : "w"
     }
+
+
+""" IMDB CONSTANTS """
+TV_TYPES = ['tv series', 'tv mini series']
