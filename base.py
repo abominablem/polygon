@@ -94,7 +94,7 @@ class PolygonWindowBase:
 
 polygon_db = MultiConnection(
     r".\data\polygon.db",
-    ["series", "episodes", "titles", "entries", "tags"],
+    ["series", "episodes", "titles", "entries", "entry_tags", "title_tags"],
     debug = c.DEBUG
     )
 
