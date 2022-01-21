@@ -13,6 +13,8 @@ from datetime import datetime
 import constants as c
 import futil as f
 import base
+from mh_logging import log_class
+log_class = log_class("None")
 
 imdb = IMDb()
 
@@ -30,6 +32,7 @@ def standardise_id(imdb_id):
         return imdb_id
 
 class Title:
+    @log_class
     def __init__(self, title_id = None, detail = None):
         if not title_id is None:
             self.clear()
@@ -38,6 +41,7 @@ class Title:
         if not detail is None:
             self.__dict__.update(detail)
 
+    @log_class
     def refresh(self, detail = None):
         """ Update object based on latest IMDb data """
         self.clear()
@@ -46,10 +50,12 @@ class Title:
         else:
             self.__dict__.update(detail)
 
+    @log_class
     def from_object(self, movie):
         """ Create Title object from imdb.Movie.Movie object """
         self._data_from_object(movie)
 
+    @log_class
     def _data_from_object(self, movie):
         self.title_id = standardise_id(movie.getID())
         self._title = movie
@@ -85,17 +91,20 @@ class Title:
         self.genre = ", ".join(self._genres)
         self.writer = ", ".join(self._writers)
 
-        self.imdb_user_rating = self._data_get("rating", None)
+        self.imdb_user_rating = round(self._data_get("rating", None), 1)
         self.imdb_user_votes = self._data_get("votes", 0)
 
         self.runtime = f.list_default(
             self._data_get("runtimes", []), 0, None
             )
 
-        self.plot_tag = f.list_default(
-            self._data_get("plot", []), 0, ""
-            )
+        plot = self._data_get("plot", [])
+        if isinstance(plot, str):
+            self.plot_tag = plot.strip()
+        else:
+            self.plot_tag = f.list_default(plot, 0, "").strip()
 
+    @log_class
     def get_episodes(self):
         if not self.type in c.TV_TYPES:
             raise WrongTitleTypeError(self.type)
@@ -105,11 +114,14 @@ class Title:
         self.episodes = {}
         for season in self._data["episodes"]:
             self.episodes[season] = {}
-            for episode in season:
+            for episode in self._data["episodes"][season]:
                 movie = self._data["episodes"][season][episode]
-                self.episodes[season][episode] = Title().from_object(movie)
+                title = Title()
+                title.from_object(movie)
+                self.episodes[season][episode] = title
         return self.episodes
 
+    @log_class
     def clear(self):
         """ Clear attributes """
         self.title_id = None
@@ -134,10 +146,12 @@ class Title:
         self.runtime = None
         self.plot_tag = None
 
+    @log_class
     def _data_get(self, key, default):
         """ Get data from imdb.Title.data object """
         return self._data.get(key, default)
 
+    @log_class
     def get_dict(self, type = "title"):
         """ Get dictionary of values used in a given table """
         if type == "title":
@@ -148,8 +162,9 @@ class Title:
                 )
         elif type == "series":
             return_dict = self._get_dict(
-                ["series_id", "title", "type", "year", "genre", "plot_tag",
-                 "imdb_user_rating", "imdb_user_votes"]
+                ["title_id", "title", "original_title", "type", "year",
+                 "genre", "runtime", "plot_tag", "imdb_user_rating",
+                 "imdb_user_votes"]
                 )
         elif type == "episode":
             return_dict = self._get_dict(
@@ -159,9 +174,11 @@ class Title:
             raise ValueError("Unrecognised title type")
         return return_dict
 
+    @log_class
     def _get_dict(self, keys):
         return {key: self.__dict__[key] for key in keys}
 
+    @log_class
     def get_tags(self, type = "title"):
         """ Return dictionary of title tags for fields which can take multiple
         values """
@@ -181,7 +198,7 @@ class Title:
         else:
             raise ValueError("Unrecognised title type")
 
-
+    @log_class
     def _clean_release_date(self, release_date):
         """ Parse dates of the form e.g. 12 Mar. 2020 """
         if release_date is None: return
@@ -197,10 +214,11 @@ class Title:
                 "%d %b %Y"
                 )
             release_date = parsed_date.strftime("%Y-%m-%d")
-        except:
+        except: #TODO work out exact error if it can't parse
             pass
         return release_date
 
+    @log_class
     def get_series(self):
         """ Return Title object of parent series """
         if self.type == "episode":
@@ -210,6 +228,7 @@ class Title:
         else:
             raise WrongTitleTypeError(self.type)
 
+    @log_class
     def _clean_original_title(self, original_title, year):
         """ Remove ' (XXXX)' from the end of the title where XXXX is the
         release year """
@@ -218,6 +237,7 @@ class Title:
         else:
             return original_title
 
+    @log_class
     def _get_names(self, people, firstn = 0):
         if not isinstance(people, list):
             people = [people]
@@ -228,6 +248,7 @@ class Title:
         names = [person.data['name'] for person in people]
         return names
 
+    @log_class
     def __str__(self):
         if self.type == "episode":
             date = "??" if self.release_date is None else self.release_date
@@ -293,6 +314,7 @@ class WrongTitleTypeError(base.PolygonException):
 class IMDbFunctions:
     """ Container for function classes relating to specific tables, and
     functions relating to multiple tables """
+    @log_class
     def __init__(self):
         self.titles = IMDbTitleFunctions()
         self.entries = IMDbEntryFunctions()
@@ -302,6 +324,7 @@ class IMDbFunctions:
         self.episodes = IMDbEpisodesFunctions()
         self.db = base.polygon_db
 
+    @log_class
     def exists(self, title):
         if isinstance(title, Title):
             title_id = title.title_id
@@ -314,6 +337,7 @@ class IMDbFunctions:
 
         return self.titles.exists(title_id) or self.series.exists(title_id)
 
+    @log_class
     def add_title(self, title):
         """ Add a new title/series to the correct table """
         if self.exists(title):
@@ -338,6 +362,7 @@ class IMDbFunctions:
         except TitleExistsError:
             raise
 
+    @log_class
     def _add_episode(self, title):
         """ Test adding an episode and raise any errors that would occur. These
         are then handled in the front end by either importing or updating the
@@ -350,6 +375,7 @@ class IMDbFunctions:
         if not self.titles.exists(title):
             raise EpisodeNotExistsError
 
+    @log_class
     def _add_series(self, title):
         """ Add a new series to the series table and add the episodes """
         try:
@@ -359,10 +385,12 @@ class IMDbFunctions:
         self.episodes.add(title)
         self.title_tags.add_dict(title.title_id, title.get_tags("series"))
 
+    @log_class
     def _add_title(self, title):
         self.titles.add(title)
         self.title_tags.add_dict(title.title_id, title.get_tags("title"))
 
+    @log_class
     def add_entry(self, imdb_id, tags = None, **kwargs):
         """ Add new entry to the entries table. """
         try:
@@ -371,53 +399,97 @@ class IMDbFunctions:
             pass
         self.entries.add(imdb_id, **kwargs)
         entry_id = max(self.entries.get_entry_id(title_id = imdb_id, **kwargs))
-        # Expect tags in dictionary format of {tag_name: tag_value}. If
-        # tag_name is None, assume tag_value is either a single tag or list
-        # of tags to be added with NULL tag_name
         self.entry_tags.add_dict(entry_id, tags)
 
-class IMDbEpisodesFunctions:
-    """ Container for functions relating to the episodes table """
+class IMDbBaseTitleFunctions:
+    """ Base class for function classes editing the titles table """
     def __init__(self):
-        self.db = base.polygon_db.episodes
+        pass
 
-    def add(self, title):
-        """ Add an episode or series of episodes to the database """
-        if title.type in c.TV_TYPES:
-            self._add_series_episodes(title)
-        elif title.type == "episode":
-            if self.exists(title):
-                raise TitleExistsError
-            self.db.insert(**title.get_dict("episode"))
-        else:
-            raise WrongTitleTypeError(title.type)
-
-    def _add_series_episodes(self, title):
-        """ Add all episodes in series to database (unless already present) """
-        series = title.get_episodes()
-        for season in series:
-            for episode in season:
-                if self.exists(episode):
-                    pass
-                else:
-                    self.add(episode)
-
+    @log_class
     def exists(self, title):
         """ Return if series exists in database """
         if isinstance(title, Title):
             title = title.title_id
         return self.exists_id(title)
 
+    @log_class
     def exists_id(self, title_id):
         """ Return if title_id exists in database """
         result = self.db.filter({"title_id": title_id}, "title_id")
         return len(result["title_id"]) != 0
 
-class IMDbSeriesFunctions:
-    """ Container for functions relating to the series table """
-    def __init__(self):
-        self.db = base.polygon_db.series
+    @log_class
+    def update(self, imdb_id, detail):
+        #TODO
+        pass
 
+    @log_class
+    def get_detail(self, imdb_id):
+        """ Return dict of database values for an imdb_id """
+        if not self.exists(imdb_id):
+            raise TitleNotExistsError
+        detail = self.db.filter({"title_id": imdb_id}, "*", rc = "rowdict")[0]
+        return detail
+
+    @log_class
+    def get(self, imdb_id, refresh = False):
+        """ Get Title object. Optionally refresh from latest IMDb data."""
+        if refresh:
+            return Title(title_id = imdb_id)
+        else:
+            try:
+                return Title(detail = self.get_detail(imdb_id))
+            except TitleNotExistsError:
+                return Title(title_id = imdb_id)
+
+
+class IMDbEpisodesFunctions(IMDbBaseTitleFunctions):
+    """ Container for functions relating to the episodes table """
+    @log_class
+    def __init__(self):
+        super().__init__()
+        self.episodes_db = base.polygon_db.episodes
+        self.db = base.polygon_db.titles
+
+    @log_class
+    def add(self, title):
+        """ Add an episode or series of episodes to the database """
+        if title.type in c.TV_TYPES:
+            self._add_series_episodes(title)
+        elif title.type == "episode":
+            if self.exists(title):
+                return
+            self._add_episode(title)
+        else:
+            raise WrongTitleTypeError(title.type)
+
+    @log_class
+    def _add_episode(self, title):
+        """ Add an episode to the titles table """
+        title_dict = title.get_dict("title")
+        title_dict["import_date"] = self.db.getdate()
+        self.db.insert(**title_dict)
+        self.episodes_db.insert(**title.get_dict("episode"))
+
+    @log_class
+    def _add_series_episodes(self, title):
+        """ Add all episodes in series to database """
+        series = title.get_episodes()
+        for season in series:
+            for episode in series[season]:
+                title = Title(series[season][episode].title_id)
+                self.add(title)
+
+class IMDbSeriesFunctions(IMDbBaseTitleFunctions):
+    """ Container for functions relating to the series table """
+    @log_class
+    def __init__(self):
+        super().__init__()
+        self.db = base.polygon_db.titles
+        self.series_db = base.polygon_db.series
+
+    @log_class
     def add(self, title):
         """ Insert a series to the database if it does not already exist """
         if not title.type in c.TV_TYPES:
@@ -429,28 +501,16 @@ class IMDbSeriesFunctions:
         title_dict = title.get_dict("series")
         title_dict["import_date"] = self.db.getdate()
         self.db.insert(**title_dict)
+        self.series_db.insert(series_id = title.title_id)
         return title
-
-    def update(self, imdb_id, detail):
-        #TODO
-        pass
-
-    def exists(self, title):
-        """ Return if series exists in database """
-        if isinstance(title, Title):
-            title = title.title_id
-        return self.exists_id(title)
-
-    def exists_id(self, series_id):
-        """ Return if series_id exists in database """
-        result = self.db.filter({"series_id": series_id}, "series_id")
-        return len(result["series_id"]) != 0
 
 class IMDbTitleTagsFunctions:
     """ Container for functions relating to the entry_tags table """
+    @log_class
     def __init__(self):
         self.db = base.polygon_db.title_tags
 
+    @log_class
     def add_dict(self,title_id, tag_dict):
         for tag_name, tags in tag_dict.items():
             if not isinstance(tags, list):
@@ -458,6 +518,7 @@ class IMDbTitleTagsFunctions:
             for tag_value in tags:
                 self.add(title_id, tag_value, tag_name)
 
+    @log_class
     def add(self, title_id, tag_value, tag_name = None):
         # tags should never be duplicated
         if self.exists(title_id, tag_value, tag_name):
@@ -470,6 +531,7 @@ class IMDbTitleTagsFunctions:
 
         self.db.insert(**detail)
 
+    @log_class
     def exists(self, title_id, tag_value, tag_name = None):
         result = self.db.filter({"title_id": title_id,
                                  "tag_value": tag_value,
@@ -504,28 +566,14 @@ class IMDbEntryTagsFunctions:
                                  "tag_name": tag_name}, "entry_id")
         return len(result["entry_id"]) != 0
 
-class IMDbTitleFunctions:
+class IMDbTitleFunctions(IMDbBaseTitleFunctions):
     """ Container for functions relating to the Titles table """
+    @log_class
     def __init__(self):
+        super().__init__()
         self.db = base.polygon_db.titles
 
-    def get(self, imdb_id, refresh = True):
-        """ Get Title object. Optionally refresh from latest IMDb data."""
-        if refresh:
-            return Title(title_id = imdb_id)
-        else:
-            try:
-                return Title(detail = self.get_detail(imdb_id))
-            except TitleNotExistsError:
-                return Title(title_id = imdb_id)
-
-    def get_detail(self, imdb_id):
-        """ Return dict of database values for an imdb_id """
-        if not self.exists(imdb_id):
-            raise TitleNotExistsError
-        detail = self.db.filter({"imdb_id": imdb_id}, "*")
-        return detail
-
+    @log_class
     def add(self, title):
         """ Insert a title to the database if it does not already exist """
         if title.type in c.TV_TYPES:
@@ -536,26 +584,13 @@ class IMDbTitleFunctions:
         self.db.insert(**title_dict)
         return title
 
-    def update(self, imdb_id, detail):
-        #TODO
-        pass
-
-    def exists_id(self, imdb_id):
-        """ Return if imdb_id exists in database """
-        result = self.db.filter({"title_id": imdb_id}, "title_id")
-        return len(result["title_id"]) != 0
-
-    def exists(self, title):
-        """ Return if title exists in database """
-        if isinstance(title, Title):
-            title = title.title_id
-        return self.exists_id(title)
-
 class IMDbEntryFunctions:
     """ Container for functions relating to the Entries table """
+    @log_class
     def __init__(self):
         self.db = base.polygon_db.entries
 
+    @log_class
     def add(self, title_id, entry_date, entry_order = None,
                   rating = None, rewatch = False, notes = ""):
         """ Insert a new entry row into entries table """
@@ -580,6 +615,7 @@ class IMDbEntryFunctions:
 
         self.db.insert(**detail)
 
+    @log_class
     def _offset_entries(self, entry_date, start, rollback = False):
         """ Offset all entry orders on a specific date greater than or equal to
         a certain order value up by one. For inserting a new entry in between
@@ -593,19 +629,22 @@ class IMDbEntryFunctions:
             "AND entry_order >= %s" % start
             )
 
+    @log_class
     def _get_entry_order(self, entry_date):
         """ Get the next order number for an entry_date """
         rows = self.db.select("SELECT COUNT(*) FROM entries "
                               "WHERE entry_date = '%s'" % entry_date)
         return rows[0][0] + 1
 
+    @log_class
     def get_entry_id(self, **kwargs):
         result = self.db.filter(kwargs, "entry_id")
         return result["entry_id"]
 
 
 imdbf = IMDbFunctions()
-imdbf.add_entry("tt2953050", rating = 6, notes = "Download",
-                entry_date = "2022-01-19", tags = {"platform": "Download"})
+# imdbf.add_entry("tt0059319", tags = dict(platform = "BBC iPlayer"),
+#                 entry_date = "2022-01-20", rating = 8, notes = 'BBC iPlayer')
 
+    imdbf.add_title(series_id)
 base.polygon_db.close()
