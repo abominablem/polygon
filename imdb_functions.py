@@ -91,7 +91,12 @@ class Title:
         self.genre = ", ".join(self._genres)
         self.writer = ", ".join(self._writers)
 
-        self.imdb_user_rating = round(self._data_get("rating", None), 1)
+        rating = self._data_get("rating", None)
+        if rating is None:
+            self.imdb_user_rating = rating
+        else:
+            self.imdb_user_rating = round(rating, 1)
+
         self.imdb_user_votes = self._data_get("votes", 0)
 
         self.runtime = f.list_default(
@@ -108,11 +113,13 @@ class Title:
     def get_episodes(self):
         if not self.type in c.TV_TYPES:
             raise WrongTitleTypeError(self.type)
-        imdb.update(self._title, "episodes")
+
+        if hasattr(self, "_title"):
+            imdb.update(self._title, "episodes")
 
         # Create dictionary of Title object for each season/episode
         self.episodes = {}
-        for season in self._data["episodes"]:
+        for season in self._data_get("episodes", {}):
             self.episodes[season] = {}
             for episode in self._data["episodes"][season]:
                 movie = self._data["episodes"][season][episode]
@@ -335,7 +342,7 @@ class IMDbFunctions:
         else:
             raise ValueError("Unknown input type %s" % type(title))
 
-        return self.titles.exists(title_id) or self.series.exists(title_id)
+        return self.titles.exists(title_id)
 
     @log_class
     def add_title(self, title):
@@ -368,12 +375,15 @@ class IMDbFunctions:
         are then handled in the front end by either importing or updating the
         series data """
         # check if the parent series exists in database
-        if not self.series.exists(title):
+        if not self.series.exists(title.series_id):
             raise SeriesNotExistsError
 
         # check if the episode exists as a title in the database
-        if not self.titles.exists(title):
-            raise EpisodeNotExistsError
+        if self.titles.exists(title):
+            raise EpisodeExistsError
+
+        self.episodes.add(title)
+
 
     @log_class
     def _add_series(self, title):
@@ -391,14 +401,18 @@ class IMDbFunctions:
         self.title_tags.add_dict(title.title_id, title.get_tags("title"))
 
     @log_class
-    def add_entry(self, imdb_id, tags = None, **kwargs):
+    def add_entry(self, title_id, tags = None, **kwargs):
         """ Add new entry to the entries table. """
         try:
-            self.add_title(imdb_id)
+            self.add_title(title_id)
         except TitleExistsError:
             pass
-        self.entries.add(imdb_id, **kwargs)
-        entry_id = max(self.entries.get_entry_id(title_id = imdb_id, **kwargs))
+        self.entries.add(title_id, **kwargs)
+        # get the auto-generated id of the entry that was just added
+        filters = kwargs
+        try: del filters["rewatch"]
+        except KeyError: pass
+        entry_id = max(self.entries.get_entry_id(title_id = title_id, **filters))
         self.entry_tags.add_dict(entry_id, tags)
 
 class IMDbBaseTitleFunctions:
@@ -591,27 +605,30 @@ class IMDbEntryFunctions:
         self.db = base.polygon_db.entries
 
     @log_class
-    def add(self, title_id, entry_date, entry_order = None,
-                  rating = None, rewatch = False, notes = ""):
+    def add(self, title_id, entry_date = None, entry_order = None,
+            rating = None, rewatch = False):
         """ Insert a new entry row into entries table """
         if isinstance(title_id, Title):
             title_id = title_id.title_id
         detail = dict(
             title_id = title_id,
-            entry_date = entry_date,
             rewatch = rewatch
             )
 
+        if not entry_date is None:
+            detail["entry_date"] = entry_date
+
         # if the entry order is not specified, assume entries were logged
         # chronologically and add one to the maximum order
-        if entry_order is None:
+        if entry_date is None:
+            pass
+        elif entry_order is None:
             detail["entry_order"] = self._get_entry_order(entry_date)
         else:
             self._offset_entries(entry_date, entry_order)
             detail["entry_order"] = entry_order
 
         if not rating is None: detail["rating"] = rating
-        if not notes == "" and not notes is None: detail["notes"] = notes
 
         self.db.insert(**detail)
 
@@ -643,8 +660,6 @@ class IMDbEntryFunctions:
 
 
 imdbf = IMDbFunctions()
-# imdbf.add_entry("tt0059319", tags = dict(platform = "BBC iPlayer"),
-#                 entry_date = "2022-01-20", rating = 8, notes = 'BBC iPlayer')
+# imdbf.add_entry(title_id = 'tt4244994', entry_date = '2022-01-22', rating = 7, rewatch = False, tags  = {'platform': 'Download'})
 
-    imdbf.add_title(series_id)
 base.polygon_db.close()
