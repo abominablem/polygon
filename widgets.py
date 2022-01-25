@@ -151,17 +151,22 @@ class TitleModule(tk.Frame):
     """ Bordered frame containing Date, Title, Original title, Director, Year,
     Runtime, and Rating """
     @log_class
-    def __init__(self, master, **kwargs):
+    def __init__(self, master, include_rewatch = True, include_number = True,
+                 **kwargs):
         self.master = master
-        super().__init__(self.master, **kwargs, highlightthickness = 7,
-                         highlightbackground = "lime green",
-                         highlightcolor = "lime green")
+        super().__init__(self.master, **kwargs)
         font_date = ("Calibri", 24, "bold")
         font_title = ("Calibri", 28)
         font_subtitle = ("Calibri", 18, "italic")
         font_rating = ("Calibri", 32, "bold")
+        font_number = ("Calibri", 32)
 
-        self.widget_frame = tk.Frame(self)
+        self.border_frame = tk.Frame(
+            self, highlightthickness = 7, highlightbackground = "lime green",
+            highlightcolor = "lime green"
+            )
+
+        self.widget_frame = tk.Frame(self.border_frame)
         self.date = tk.Label(
             self.widget_frame, bg = "white", anchor = "center",
             font = font_date, padx = 20, pady = 0
@@ -213,7 +218,7 @@ class TitleModule(tk.Frame):
                                                   [1, 3, 4, 6]])
         self.widget_frame.grid(row = 0, column = 0, **c.GRID_STICKY)
 
-        self.rating_frame = tk.Frame(self)
+        self.rating_frame = tk.Frame(self.border_frame)
         self.rating = RatingDisplay(
             self.rating_frame, font = font_rating, padx = 20
             )
@@ -233,8 +238,27 @@ class TitleModule(tk.Frame):
                     }
         self.rating_widget_set = tka.WidgetSet(
             self.rating_frame, widgets, layout = [[1], [2], [3]])
-
         self.rating_frame.grid(row = 0, column = 1, **c.GRID_STICKY)
+
+
+        self.include_number = include_number
+        if include_number:
+            self.number = tk.Label(
+                self, bg = "black", anchor = "center", font = font_number,
+                padx = 40, fg = "white"
+                )
+            self.number.grid(row = 0, column = 0, **c.GRID_STICKY)
+        self.border_frame.grid(row = 0, column = 1, **c.GRID_STICKY)
+
+        self.include_rewatch = include_rewatch
+        if include_rewatch:
+            self.rewatch = tk.Label(
+                self, bg = "black", anchor = "center", font = font_rating,
+                padx = 40, fg = "white"
+                )
+            self.rewatch.grid(row = 0, column = 2, **c.GRID_STICKY)
+
+        self.border_frame.columnconfigure(0, weight = 1)
         self.columnconfigure(0, weight = 1)
 
     @log_class
@@ -277,6 +301,12 @@ class TitleModule(tk.Frame):
                 text = kwargs[kw]
                 self.date.config(text = self.format_date(text))
 
+            elif kw == "rewatch" and self.include_rewatch:
+                if kwargs[kw]:
+                    self.rewatch.config(text = "⟳")
+                else:
+                    self.rewatch.config(text = "")
+
             else:
                 self.__dict__[kw].config(text = kwargs[kw])
 
@@ -289,10 +319,10 @@ if __name__ == "__main__":
     root = tk.Tk()
 
     if test == "RatingDisplay":
-        rating_frame = tk.Frame(root)
+        rating_frame = tk.Frame(root, bg = "white")
         # place ratings in frame to centre it vertically
         ratings = RatingDisplay(rating_frame, min_rating = 0, max_rating = 10,
-                                font = ("Helvetica", 32, "bold"))
+                                font = ("Helvetica", 32, "bold"), bg = "white")
         ratings.set_colour_map(
             {1: "red", 2: "red", 3: "orange", 4: "orange", 5: "#ffbf00",
               6: "#ffbf00", 7: "lime green", 8: "lime green", 9: "forest green",
@@ -312,7 +342,7 @@ if __name__ == "__main__":
         btn_up.grid(row = 0, column = 0, sticky = "nesw")
         btn_down.grid(row = 0, column = 2, sticky = "nesw")
 
-        ratings.grid(row = 0, column = 0, sticky = "ew")
+        ratings.grid(row = 0, column = 0, sticky = "ew") #expand only sideways
         rating_frame.rowconfigure(0, weight = 1)
         rating_frame.columnconfigure(0, weight = 1)
         rating_frame.grid(row = 0, column = 1, sticky = "nesw")
@@ -327,12 +357,10 @@ if __name__ == "__main__":
         title.set_text(date = "2022-01-22", title = "The Last Duel",
                       director = "Ridley Scott",
                       original_title = "The Last Duel",
-                      year = 2021, runtime = "156", rating = 6)
+                      year = 2021, runtime = "156", rating = 6,
+                      rewatch = True, number = 1)
         title.grid(row = 0, column = 0, sticky = "nesw")
         root.rowconfigure(0, weight = 1)
         root.columnconfigure(0, weight = 1)
-
-
-
 
     root.mainloop()
