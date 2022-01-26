@@ -92,6 +92,24 @@ class PolygonWindowBase:
         self.window.grab_set()
         self.window.mainloop()
 
+class TrimmedFrame(tk.Frame):
+    @log_class
+    def __init__(self, master, *args, **kwargs):
+        super().__init__(master, *args, **kwargs)
+
+        self.outer = tk.Frame(
+            self, highlightthickness = 7, highlightbackground = "lime green",
+            highlightcolor = "lime green"
+            )
+        self.inner = tk.Frame(
+            self.outer, highlightthickness = 1,
+            highlightbackground = "black", highlightcolor = "black"
+            )
+        self.outer.grid(row = 0, column = 0, **c.GRID_STICKY)
+        self.outer.columnconfigure(0, weight = 1)
+        self.inner.grid(row = 0, column = 0, **c.GRID_STICKY)
+        self.inner.columnconfigure(0, weight = 1)
+
 polygon_db = MultiConnection(
     r".\data\polygon.db",
     ["series", "episodes", "titles", "entries", "entry_tags", "title_tags"],
