@@ -15,6 +15,7 @@ import tk_arrange as tka
 from mh_logging import log_class
 import constants as c
 import futil as futil
+from base import TrimmedFrame
 
 log_class = log_class(c.LOG_LEVEL)
 
@@ -147,7 +148,7 @@ class RatingDisplay(tk.Text):
         return dict
 
 
-class TitleModule(tk.Frame):
+class TitleWidget(tk.Frame):
     """ Bordered frame containing Date, Title, Original title, Director, Year,
     Runtime, and Rating """
     @log_class
@@ -155,25 +156,23 @@ class TitleModule(tk.Frame):
                  **kwargs):
         self.master = master
         super().__init__(self.master, **kwargs)
-        font_date = ("Calibri", 24, "bold")
-        font_title = ("Calibri", 28)
-        font_subtitle = ("Calibri", 18, "italic")
-        font_rating = ("Calibri", 32, "bold")
-        font_number = ("Calibri", 32)
+        font_date = ("Calibri", 28, "bold")
+        font_title = ("Calibri", 32)
+        font_subtitle = ("Calibri", 22, "italic")
+        font_rating = ("Calibri", 36, "bold")
+        font_number = ("Calibri", 36)
 
-        self.border_frame = tk.Frame(
-            self, highlightthickness = 7, highlightbackground = "lime green",
-            highlightcolor = "lime green"
-            )
+        self.border_frame = TrimmedFrame(self)
+        self.border_frame.columnconfigure(0, weight = 1)
 
-        self.widget_frame = tk.Frame(self.border_frame)
+        self.widget_frame = tk.Frame(self.border_frame.inner)
         self.date = tk.Label(
             self.widget_frame, bg = "white", anchor = "center",
             font = font_date, padx = 20, pady = 0
             )
         self.title = tk.Label(
             self.widget_frame, bg = "white", anchor = "w", font = font_title,
-            padx = 10, width = 40, pady = 0
+            padx = 10, pady = 0
             )
         self.original_title = tk.Label(
             self.widget_frame, bg = "white", anchor = "w", font = font_subtitle,
@@ -201,7 +200,7 @@ class TitleModule(tk.Frame):
                        'stretch_width': True,},
                    3: {'widget': self.original_title,
                        'grid_kwargs': c.GRID_STICKY,
-                       'stretch_width': True, 'stretch_width_weight': 3},
+                       'stretch_width': True, 'stretch_width_weight': 2},
                    4: {'widget': self.director,
                        'grid_kwargs': c.GRID_STICKY,
                        'stretch_width': True, 'stretch_width_weight': 1},
@@ -218,7 +217,8 @@ class TitleModule(tk.Frame):
                                                   [1, 3, 4, 6]])
         self.widget_frame.grid(row = 0, column = 0, **c.GRID_STICKY)
 
-        self.rating_frame = tk.Frame(self.border_frame)
+        """ Title rating """
+        self.rating_frame = tk.Frame(self.border_frame.inner)
         self.rating = RatingDisplay(
             self.rating_frame, font = font_rating, padx = 20
             )
@@ -229,17 +229,16 @@ class TitleModule(tk.Frame):
             )
         widgets = {1: {'widget': tk.Frame(self.rating_frame, bg = "white"),
                        'stretch_height': True,
-                        'grid_kwargs': c.GRID_STICKY,},
-                    2: {'widget': self.rating,
-                        'grid_kwargs': c.GRID_STICKY,},
-                    3: {'widget': tk.Frame(self.rating_frame, bg = "white"),
+                       'grid_kwargs': c.GRID_STICKY,},
+                   2: {'widget': self.rating,
+                       'grid_kwargs': c.GRID_STICKY,},
+                   3: {'widget': tk.Frame(self.rating_frame, bg = "white"),
                        'stretch_height': True,
-                        'grid_kwargs': c.GRID_STICKY,},
+                       'grid_kwargs': c.GRID_STICKY,},
                     }
         self.rating_widget_set = tka.WidgetSet(
             self.rating_frame, widgets, layout = [[1], [2], [3]])
         self.rating_frame.grid(row = 0, column = 1, **c.GRID_STICKY)
-
 
         self.include_number = include_number
         if include_number:
@@ -247,19 +246,23 @@ class TitleModule(tk.Frame):
                 self, bg = "black", anchor = "center", font = font_number,
                 padx = 40, fg = "white"
                 )
-            self.number.grid(row = 0, column = 0, **c.GRID_STICKY)
-        self.border_frame.grid(row = 0, column = 1, **c.GRID_STICKY)
 
         self.include_rewatch = include_rewatch
         if include_rewatch:
             self.rewatch = tk.Label(
                 self, bg = "black", anchor = "center", font = font_rating,
-                padx = 40, fg = "white"
+                padx = 40, fg = "white", text = "⟳"
                 )
-            self.rewatch.grid(row = 0, column = 2, **c.GRID_STICKY)
 
-        self.border_frame.columnconfigure(0, weight = 1)
-        self.columnconfigure(0, weight = 1)
+        widgets = {1: {'widget': self.number,
+                       'grid_kwargs': c.GRID_STICKY,},
+                   2: {'widget': self.border_frame,
+                       'grid_kwargs': c.GRID_STICKY,
+                       'stretch_width': True,},
+                   3: {'widget': self.rewatch,
+                       'grid_kwargs': c.GRID_STICKY,},
+                   }
+        self.widgets = tka.WidgetSet(self, widgets, layout = [1,2,3])
 
     @log_class
     def format_runtime(self, runtime):
@@ -303,17 +306,18 @@ class TitleModule(tk.Frame):
 
             elif kw == "rewatch" and self.include_rewatch:
                 if kwargs[kw]:
-                    self.rewatch.config(text = "⟳")
+                    self.rewatch.config(fg = "white")
                 else:
-                    self.rewatch.config(text = "")
+                    self.rewatch.config(fg = "black")
+
+            elif kw == "number" and self.include_number:
+                self.__dict__[kw].config(text = kwargs[kw])
 
             else:
                 self.__dict__[kw].config(text = kwargs[kw])
 
-
-
 # test = "RatingDisplay"
-test = "TitleModule"
+test = "TitleWidget"
 
 if __name__ == "__main__":
     root = tk.Tk()
@@ -352,15 +356,25 @@ if __name__ == "__main__":
         root.columnconfigure(1, weight = 1)
         root.columnconfigure(2, weight = 1)
 
-    elif test == "TitleModule":
-        title = TitleModule(root)
-        title.set_text(date = "2022-01-22", title = "The Last Duel",
-                      director = "Ridley Scott",
-                      original_title = "The Last Duel",
-                      year = 2021, runtime = "156", rating = 6,
-                      rewatch = True, number = 1)
+    elif test == "TitleWidget":
+        title = TitleWidget(root, bg = "black", pady = 30)
+        title.set_text(
+            date = "2022-01-22", title = "The Last Duel",
+            director = "Ridley Scott", original_title = "The Last Duel",
+            year = 2021, runtime = "156", rating = 6, rewatch = True,
+            number = 1
+            )
         title.grid(row = 0, column = 0, sticky = "nesw")
+        title = TitleWidget(root, bg = "black", pady = 30)
+        title.set_text(
+            date = "2022-01-22", title = "Those Magnificent Men in Their Flying Machines or How I Flew from London to Paris in 25 hours 11 minutes",
+            director = "director", original_title = "abcdefghijklmnopqrstuvwxyz",
+            year = 2021, runtime = "165", rating = 10, rewatch = False,
+            number = 2
+            )
+        title.grid(row = 1, column = 0, sticky = "nesw")
         root.rowconfigure(0, weight = 1)
+        root.rowconfigure(1, weight = 1)
         root.columnconfigure(0, weight = 1)
 
     root.mainloop()
