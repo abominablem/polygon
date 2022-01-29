@@ -98,8 +98,9 @@ class TrimmedFrame(tk.Frame):
         super().__init__(master, *args, **kwargs)
 
         self.outer = tk.Frame(
-            self, highlightthickness = 7, highlightbackground = "lime green",
-            highlightcolor = "lime green"
+            self, highlightthickness = 7,
+            highlightbackground = c.COLOUR_FILM_TRIM,
+            highlightcolor = c.COLOUR_FILM_TRIM
             )
         self.inner = tk.Frame(
             self.outer, highlightthickness = 1,
@@ -107,8 +108,10 @@ class TrimmedFrame(tk.Frame):
             )
         self.outer.grid(row = 0, column = 0, **c.GRID_STICKY)
         self.outer.columnconfigure(0, weight = 1)
+        self.outer.rowconfigure(0, weight = 1)
         self.inner.grid(row = 0, column = 0, **c.GRID_STICKY)
         self.inner.columnconfigure(0, weight = 1)
+        self.inner.rowconfigure(0, weight = 1)
 
 polygon_db = MultiConnection(
     r".\data\polygon.db",
