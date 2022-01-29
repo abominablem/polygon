@@ -384,7 +384,6 @@ class IMDbFunctions:
 
         self.episodes.add(title)
 
-
     @log_class
     def _add_series(self, title):
         """ Add a new series to the series table and add the episodes """
@@ -414,6 +413,69 @@ class IMDbFunctions:
         except KeyError: pass
         entry_id = max(self.entries.get_entry_id(title_id = title_id, **filters))
         self.entry_tags.add_dict(entry_id, tags)
+
+    def get_entry_by_rank(self, rank = None, type = None, rewatch = None):
+        """ Return a dictionary of values for use in a TitleModule widget
+        based on the provided single or iterable of entry ranks """
+        # filter to apply to the inner joined entries/titles table
+        inner_filters = [" entry_date IS NOT NULL"]
+        if type is None:
+            pass
+        elif type == "movie":
+            inner_filters.append("type IN ('movie', 'tv movie')")
+        else:
+            raise ValueError("Invalid type")
+
+        if rewatch is None or rewatch:
+            pass
+        elif not rewatch:
+            inner_filters.append("rewatch = 'False'")
+
+        if inner_filters == []:
+            where = ""
+        else:
+            where = "WHERE " + " AND ".join(inner_filters)
+
+        all_ranks = (rank is None)
+
+        if all_ranks:
+            rank = ""
+        else:
+            if isinstance(rank, str) or isinstance(rank, int):
+                rank = [rank]
+            rank_int = [int(rk) for rk in rank]
+            rank_int.sort()
+            rank_str = [str(rk) for rk in rank_int]
+            rank = "WHERE rank IN (%s)" % ",".join(rank_str)
+
+        query = """
+        SELECT [date], title, original_title, year, runtime, rating, rewatch
+        FROM (
+            SELECT e.entry_date as [date], COALESCE(t.custom_title, t.title)
+            AS title, t.original_title, t.year, t.runtime, e.rating, e.rewatch,
+            RANK() OVER(ORDER BY [entry_date] DESC, entry_order DESC) AS [rank]
+            FROM
+            entries e
+            LEFT JOIN
+            titles t
+            ON e.title_id = t.title_id
+            %s
+            )
+        %s
+        """ % (where, rank)
+
+        result = self.db.entries.select(query)
+        cols = ["date", "title", "original_title", "year", "runtime", "rating",
+                "rewatch"]
+        if all_ranks: rank_int = range(1, len(result) + 1)
+        results_dict_all = {}
+        for index, rank in enumerate(rank_int):
+            result_tuple = result[index]
+            result_dict = {cols[i]: val for i, val in enumerate(result_tuple)}
+            result_dict["rewatch"] = (result_dict["rewatch"] == "True")
+            result_dict["number"] = rank
+            results_dict_all[rank] = result_dict
+        return results_dict_all
 
 class IMDbBaseTitleFunctions:
     """ Base class for function classes editing the titles table """
@@ -525,7 +587,7 @@ class IMDbTitleTagsFunctions:
         self.db = base.polygon_db.title_tags
 
     @log_class
-    def add_dict(self,title_id, tag_dict):
+    def add_dict(self, title_id, tag_dict):
         for tag_name, tags in tag_dict.items():
             if not isinstance(tags, list):
                 tags = [tags]
@@ -554,9 +616,11 @@ class IMDbTitleTagsFunctions:
 
 class IMDbEntryTagsFunctions:
     """ Container for functions relating to the entry_tags table """
+    @log_class
     def __init__(self):
         self.db = base.polygon_db.entry_tags
 
+    @log_class
     def add_dict(self,entry_id, tag_dict):
         for tag_name, tags in tag_dict.items():
             if not isinstance(tags, list):
@@ -564,6 +628,7 @@ class IMDbEntryTagsFunctions:
             for tag_value in tags:
                 self.add(entry_id, tag_value, tag_name)
 
+    @log_class
     def add(self, entry_id, tag_value, tag_name = None):
         if self.exists(entry_id, tag_value, tag_name):
             raise TagExistsError
@@ -574,6 +639,7 @@ class IMDbEntryTagsFunctions:
 
         self.db.insert(**detail)
 
+    @log_class
     def exists(self, entry_id, tag_value, tag_name = None):
         result = self.db.filter({"entry_id": entry_id,
                                  "tag_value": tag_value,
@@ -659,7 +725,7 @@ class IMDbEntryFunctions:
         return result["entry_id"]
 
 
-imdbf = IMDbFunctions()
-# imdbf.add_entry(title_id = 'tt4244994', entry_date = '2022-01-22', rating = 7, rewatch = False, tags  = {'platform': 'Download'})
-
-base.polygon_db.close()
+# imdbf = IMDbFunctions()
+# imdbf.add_entry(title_id = 'tt0117500', entry_date = '2022-01-28', rating = 6, rewatch = False, tags  = {'platform': 'Download'})
+# print(imdbf.get_entry_by_rank(range(1, 6), "movie"))
+# base.polygon_db.close()
