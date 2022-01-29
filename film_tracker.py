@@ -9,6 +9,7 @@ import sys
 sys.path.append("D:\\Users\\Marcus\\Documents\\R Documents\\Coding\\Python\\Packages")
 import tkinter as tk
 from widgets import TitleModule
+from datetime import datetime
 
 from mh_logging import log_class
 import tk_arrange as tka
@@ -40,11 +41,11 @@ class FilmCounter(tk.Frame):
         self.counter_frame.inner.columnconfigure(0, weight = 1)
         self.counter_frame.inner.rowconfigure(0, weight = 1)
 
-        self.count = tk.Label(
-            self.counter_frame.inner, text = "970", font = font_count,
+        self.counter = tk.Label(
+            self.counter_frame.inner, text = "0", font = font_count,
             padx = 25, image = self._pixel, compound = "center", width = 100
             )
-        self.count.grid(row = 0, column = 1, **c.GRID_STICKY)
+        self.counter.grid(row = 0, column = 1, **c.GRID_STICKY)
         self.counter_frame.inner.columnconfigure(1, weight = 1)
 
         self.rowconfigure(0, weight = 1)
@@ -64,11 +65,15 @@ class FilmCounter(tk.Frame):
 
 class RangeDisplay(tk.Frame):
     @log_class
-    def __init__(self, master, minimum = 1, maximum = None, *args, **kwargs):
+    def __init__(self, master, minimum = 1, maximum = None, mindiff = 1,
+                 *args, **kwargs):
+        """ Display a range X - Y, with both taking a minimum or maximum value
+        and with Y - X always >= mindiff (if given) """
         super().__init__(master, *args, **kwargs)
 
         self.minimum = -9223372036854775807 if minimum is None else minimum
         self.maximum = 9223372036854775807 if maximum is None else maximum
+        self.mindiff = mindiff
 
         self.columnconfigure(0, weight = 1)
         self.rowconfigure(0, weight = 1)
@@ -80,7 +85,7 @@ class RangeDisplay(tk.Frame):
 
         font_range = ("Calibri", 36)
         self.range = tk.Label(
-            self.bordered_frame.inner, font = font_range, padx = 40
+            self.bordered_frame.inner, font = font_range, width = 11
             )
         self.range.columnconfigure(0, weight = 1)
         self.range.rowconfigure(0, weight = 1)
@@ -96,9 +101,30 @@ class RangeDisplay(tk.Frame):
         self.range.config(text = '%s - %s' % (self.lower, self.upper))
 
     @log_class
+    def set_maximum(self, maximum):
+        self.maximum = maximum
+        if self.upper > maximum:
+            self.increment(maximum - self.upper)
+
+    @log_class
+    def set_minimum(self, minimum):
+        self.minimum = minimum
+        if self.lower < minimum:
+            self.increment(self.lower - minimum)
+
+    @log_class
+    def set_increment(self, increment):
+        self.increment = increment
+        upper = self.enforce_bounds(self.lower + increment)
+        self.set_range(upper = upper)
+
+    @log_class
     def increment(self, increment):
         lower = self.enforce_bounds(self.lower + increment)
         upper = self.enforce_bounds(self.upper + increment)
+        if upper - lower < self.mindiff:
+            upper = self.enforce_bounds(lower + self.mindiff)
+            lower = self.enforce_bounds(upper - self.mindiff)
         self.set_range(lower, upper)
 
     def enforce_bounds(self, value):
@@ -176,18 +202,21 @@ class FilmTracker:
             self.header_frame, width = 150, height = c.DM_FILM_HEADER_HEIGHT
             )
 
-        self.increment = 5
+        self.increment_val = 5
+        self.last_range_change = datetime.min
         self.btn_deincrement = PolygonButton(
             self.header_frame, text = "⭠", command = self.deincrement,
             height = c.DM_FILM_HEADER_HEIGHT, width = 65, anchor = "center",
+            repeatinterval = 100, repeatdelay = 500
             )
         self.range_display = RangeDisplay(
-            self.header_frame, width = 250, height = c.DM_FILM_HEADER_HEIGHT,
-            minimum = 1, maximum = 1000 #TODO
+            self.header_frame, width = 300, height = c.DM_FILM_HEADER_HEIGHT,
+            minimum = 1, maximum = 1000,  mindiff = self.increment_val - 1
             )
         self.btn_increment = PolygonButton(
             self.header_frame, text = "⭢", command = self.increment,
-            width = 65, height = c.DM_FILM_HEADER_HEIGHT, anchor = "center",
+            height = c.DM_FILM_HEADER_HEIGHT, width = 65, anchor = "center",
+            repeatinterval = 100, repeatdelay = 500
             )
 
         self.padding_right = Padding(
@@ -195,7 +224,7 @@ class FilmTracker:
             )
 
         widgets = {1: {'widget': self.counter,
-                       'grid_kwargs': {**c.GRID_STICKY, "padx": (0, 100)}},
+                       'grid_kwargs': {**c.GRID_STICKY, "padx": (30, 100)}},
                    2: {'widget': self.padding_left,
                        'grid_kwargs': c.GRID_STICKY,
                        'stretch_width': True},
@@ -235,12 +264,42 @@ class FilmTracker:
             self.title_modules[i] = tm
             tm.set_text(number = i + 1)
             tm.grid(row = i + 1, column = 0, **c.GRID_STICKY)
+        self.get_ranked_entries()
+        self.set_title_text()
+        self.get_film_counts()
+        self.range_display.set_maximum(max(self.ranked_entries))
+        self.counter.set_counter(self.count_films)
+
+    def get_ranked_entries(self):
+        self.ranked_entries = imdbf.get_entry_by_rank(
+            rank = None, type = "movie", rewatch = False
+            )
+        self.ranked_entries_rewatches = imdbf.get_entry_by_rank(
+            rank = None, type = "movie", rewatch = True
+            )
+
+    def get_film_counts(self):
+        self.count_films = imdbf.db.entries.select(
+            """ SELECT COUNT(DISTINCT e.title_id) FROM entries e INNER JOIN
+            titles t ON e.title_id = t.title_id WHERE t.type IN
+            ('movie', 'tv movie') """)[0]
+        self.count_entries = imdbf.db.entries.select(
+            """ SELECT COUNT(*) FROM entries e INNER JOIN
+            titles t ON e.title_id = t.title_id WHERE t.type IN
+            ('movie', 'tv movie') AND e.entry_date IS NOT NULL""")[0]
 
     def set_title_text(self):
-        for order, abs_order in enumerate(
-                range(self.range_display.lower, self.range_display.upper)):
-            tdict = self._get_title_dict(abs_order)
-            self.title_modules[order].set_text(**tdict)
+        if self.btn_toggle_rewatch.toggle_on:
+            entries = self.ranked_entries_rewatches
+        else:
+            entries = self.ranked_entries
+
+        ranks = range(self.range_display.lower, self.range_display.upper + 1)
+        for order, rank in enumerate(ranks):
+            self.title_modules[order].set_text(**entries[rank])
+
+    def update_title_modules(self):
+        self.set_title_text()
 
     @log_class
     def add_new(self, *args, **kwargs):
@@ -248,7 +307,13 @@ class FilmTracker:
 
     @log_class
     def toggle_rewatch(self, *args, **kwargs):
-        raise NotImplementedError
+        if self.btn_toggle_time.toggle_on:
+            self.range_display.set_maximum(max(self.ranked_entries_rewatches))
+            self.counter.set_counter(self.count_entries)
+        else:
+            self.range_display.set_maximum(max(self.ranked_entries))
+            self.counter.set_counter(self.count_films)
+        self.update_title_modules()
 
     @log_class
     def toggle_time(self, *args, **kwargs):
@@ -259,11 +324,17 @@ class FilmTracker:
 
     @log_class
     def deincrement(self, *args, **kwargs):
-        self.range_display.increment(-1*self.increment)
+        self.range_display.increment(-1*self.increment_val)
+        self.update_title_modules()
 
     @log_class
     def increment(self, *args, **kwargs):
-        self.range_display.increment(self.increment)
+        self.range_display.increment(self.increment_val)
+        self.update_title_modules()
+
+    @log_class
+    def deincrement_all(self, *args, **kwargs):
+        self.range_display.increment(-1*self.range_display.lower + 1)
 
 
 if __name__ == "__main__":
