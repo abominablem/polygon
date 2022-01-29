@@ -148,7 +148,7 @@ class RatingDisplay(tk.Text):
         return dict
 
 
-class TitleWidget(tk.Frame):
+class TitleModule(tk.Frame):
     """ Bordered frame containing Date, Title, Original title, Director, Year,
     Runtime, and Rating """
     @log_class
@@ -168,7 +168,7 @@ class TitleWidget(tk.Frame):
         self.widget_frame = tk.Frame(self.border_frame.inner)
         self.date = tk.Label(
             self.widget_frame, bg = "white", anchor = "center",
-            font = font_date, padx = 20, pady = 0
+            font = font_date, padx = 20, pady = 0, width = 10
             )
         self.title = tk.Label(
             self.widget_frame, bg = "white", anchor = "w", font = font_title,
@@ -243,15 +243,15 @@ class TitleWidget(tk.Frame):
         self.include_number = include_number
         if include_number:
             self.number = tk.Label(
-                self, bg = "black", anchor = "center", font = font_number,
-                padx = 40, fg = "white"
+                self, bg = c.COLOUR_FILM_BACKGROUND, anchor = "e",
+                font = font_number, padx = 40, fg = "white", width = 5
                 )
 
         self.include_rewatch = include_rewatch
         if include_rewatch:
             self.rewatch = tk.Label(
-                self, bg = "black", anchor = "center", font = font_rating,
-                padx = 40, fg = "white", text = "⟳"
+                self, bg = c.COLOUR_FILM_BACKGROUND, anchor = "center",
+                font = font_rating, padx = 40, fg = "white", text = "⟳"
                 )
 
         widgets = {1: {'widget': self.number,
@@ -317,7 +317,7 @@ class TitleWidget(tk.Frame):
                 self.__dict__[kw].config(text = kwargs[kw])
 
 # test = "RatingDisplay"
-test = "TitleWidget"
+test = "TitleModule"
 
 if __name__ == "__main__":
     root = tk.Tk()
@@ -356,8 +356,8 @@ if __name__ == "__main__":
         root.columnconfigure(1, weight = 1)
         root.columnconfigure(2, weight = 1)
 
-    elif test == "TitleWidget":
-        title = TitleWidget(root, bg = "black", pady = 30)
+    elif test == "TitleModule":
+        title = TitleModule(root, bg = "black", pady = 30)
         title.set_text(
             date = "2022-01-22", title = "The Last Duel",
             director = "Ridley Scott", original_title = "The Last Duel",
@@ -365,7 +365,7 @@ if __name__ == "__main__":
             number = 1
             )
         title.grid(row = 0, column = 0, sticky = "nesw")
-        title = TitleWidget(root, bg = "black", pady = 30)
+        title = TitleModule(root, bg = "black", pady = 30)
         title.set_text(
             date = "2022-01-22", title = "Those Magnificent Men in Their Flying Machines or How I Flew from London to Paris in 25 hours 11 minutes",
             director = "director", original_title = "abcdefghijklmnopqrstuvwxyz",
