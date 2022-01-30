@@ -160,6 +160,7 @@ class TitleModule(tk.Frame):
         font_title = ("Calibri", 32)
         font_subtitle = ("Calibri", 22, "italic")
         font_rating = ("Calibri", 36, "bold")
+        font_rewatch = ("Calibri", 36)
         font_number = ("Calibri", 36)
 
         self.border_frame = TrimmedFrame(self)
@@ -172,11 +173,11 @@ class TitleModule(tk.Frame):
             )
         self.title = tk.Label(
             self.widget_frame, bg = "white", anchor = "w", font = font_title,
-            padx = 10, pady = 0
+            padx = 10, pady = 0, width = 40
             )
         self.original_title = tk.Label(
-            self.widget_frame, bg = "white", anchor = "w", font = font_subtitle,
-            padx = 10, pady = 0
+            self.widget_frame, bg = "white", anchor = "w",
+            font = font_subtitle, padx = 10, pady = 0
             )
         self._original_title_text = ""
         self.director = tk.Label(
@@ -244,14 +245,14 @@ class TitleModule(tk.Frame):
         if include_number:
             self.number = tk.Label(
                 self, bg = c.COLOUR_FILM_BACKGROUND, anchor = "e",
-                font = font_number, padx = 40, fg = "white", width = 5
+                font = font_number, padx = 40, fg = "white", width = 4
                 )
 
         self.include_rewatch = include_rewatch
         if include_rewatch:
             self.rewatch = tk.Label(
                 self, bg = c.COLOUR_FILM_BACKGROUND, anchor = "center",
-                font = font_rating, padx = 40, fg = "white", text = "⟳"
+                font = font_rewatch, padx = 40, fg = "white", text = "⟳"
                 )
 
         widgets = {1: {'widget': self.number,
