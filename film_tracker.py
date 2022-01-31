@@ -176,6 +176,7 @@ class Padding(tk.Label):
 class FilmTracker:
     @log_class
     def __init__(self, master):
+        self._during_startup = True
         self.master = master
 
         """ Build header with buttons and summary """
@@ -278,12 +279,20 @@ class FilmTracker:
         self.titlemod_frame.grid(row = 1, column = 0, **c.GRID_STICKY)
         self.titlemod_frame.columnconfigure(0, weight = 1)
         self.title_modules = {}
-        self.add_title_module()
+        for i in range(c.INT_FILM_TITLES):
+            self.add_title_module()
         self.set_counter_range()
         self.set_title_text()
 
         self._last_configured = datetime.min
         self._bind_configure()
+
+        self.master.after(1000, self.end_startup)
+
+    @log_class
+    def end_startup(self, *args, **kwargs):
+        self._during_startup = False
+
 
     @log_class
     def get_ranked_entries(self):
@@ -325,7 +334,6 @@ class FilmTracker:
                 self.title_modules[order].set_text(**entries[rank])
             except:
                 self.title_modules[order].set_text(rewatch = False)
-
 
     @log_class
     def update_title_modules(self):
@@ -390,22 +398,29 @@ class FilmTracker:
     @log_class
     def _get_max_titlemods(self):
         """ Get maximum number of title mods that will fit based on available
-        space """
-        titlemod_height = self.title_modules[0].winfo_height()
-        available_height = self.get_available_height()
-        if available_height == 0:
-            return 0
+        space. If called during startup, return the defined constant
+        default. """
+        if self._during_startup:
+            return c.INT_FILM_TITLES
         else:
-            return available_height // titlemod_height
+            titlemod_height = self.title_modules[0].winfo_height()
+            available_height = self.get_available_height()
+            if available_height == 0:
+                return 0
+            else:
+                return available_height // titlemod_height
 
     @log_class
     def _configure(self, *args, **kwargs):
         """ Called when <Configure> event is triggered. """
-        if (datetime.now() - self._last_configured).total_seconds() < 0.25:
+        if (datetime.now() - self._last_configured).total_seconds() < 0.1:
+            return
+        if self._during_startup:
             return
         # Temporarily unbind and then rebind the configure callback to prevent
         # infinite loops from creating widgets inside this function
         self._unbind_configure()
+        self._last_configured = datetime.now()
         if self.create_titlemods():
             self.update_title_modules()
         self._bind_configure()
