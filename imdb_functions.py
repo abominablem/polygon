@@ -36,7 +36,9 @@ class Title:
     def __init__(self, title_id = None, detail = None):
         if not title_id is None:
             self.clear()
-            self._data_from_object(imdb.get_movie(clean_id(title_id)))
+            movie = imdb.get_movie(clean_id(title_id))
+            imdb.update(movie, "akas")
+            self._data_from_object(movie)
 
         if not detail is None:
             self.__dict__.update(detail)
@@ -74,9 +76,7 @@ class Title:
 
         self.title = self._data["title"]
         self.year = self._data_get("year", None)
-        self.original_title = self._clean_original_title(
-            self._data_get("original title", self.title), self.year
-            )
+        self.original_title = self._get_original_title(self.year)
         self.release_date = self._clean_release_date(
             self._data.get("original air date", None)
             )
@@ -239,10 +239,21 @@ class Title:
     def _clean_original_title(self, original_title, year):
         """ Remove ' (XXXX)' from the end of the title where XXXX is the
         release year """
-        if original_title[-7:] == " (%s)" % year:
+        if year is None:
+            return original_title
+        elif original_title[-7:] == " (%s)" % year:
             return original_title[:-7]
+        elif original_title[-17:] == " (original title)":
+            return original_title[:-17]
         else:
             return original_title
+
+    def _get_original_title(self, year):
+        """ Get the original title, based on the akas and release year """
+        akas = self._data_get("akas", [])
+        original_title = (self._data_get("original title", self.title)
+                          if akas == [] or len(akas) == 0 else akas[0])
+        return self._clean_original_title(original_title, year)
 
     @log_class
     def _get_names(self, people, firstn = 0):
@@ -449,10 +460,12 @@ class IMDbFunctions:
             rank = "WHERE rank IN (%s)" % ",".join(rank_str)
 
         query = """
-        SELECT [date], title, original_title, year, runtime, rating, rewatch
+        SELECT [date], title, original_title, director, year, runtime, rating,
+        rewatch
         FROM (
             SELECT e.entry_date as [date], COALESCE(t.custom_title, t.title)
-            AS title, t.original_title, t.year, t.runtime, e.rating, e.rewatch,
+            AS title, t.original_title, t.director, t.year, t.runtime, e.rating,
+            e.rewatch,
             RANK() OVER(ORDER BY [entry_date] DESC, entry_order DESC) AS [rank]
             FROM
             entries e
@@ -465,8 +478,8 @@ class IMDbFunctions:
         """ % (where, rank)
 
         result = self.db.entries.select(query)
-        cols = ["date", "title", "original_title", "year", "runtime", "rating",
-                "rewatch"]
+        cols = ["date", "title", "original_title", "director", "year",
+                "runtime", "rating", "rewatch"]
         if all_ranks: rank_int = range(1, len(result) + 1)
         results_dict_all = {}
         for index, rank in enumerate(rank_int):
@@ -726,6 +739,7 @@ class IMDbEntryFunctions:
 
 
 # imdbf = IMDbFunctions()
-# imdbf.add_entry(title_id = 'tt0117500', entry_date = '2022-01-28', rating = 6, rewatch = False, tags  = {'platform': 'Download'})
-# print(imdbf.get_entry_by_rank(range(1, 6), "movie"))
+# # imdbf.add_entry(title_id = 'tt0093431', entry_date = '2022-01-30', rating = 6, rewatch = False, tags  = {'platform': 'Download'})
+# # imdbf.add_title("tt13146488")
+# # print(imdbf.get_entry_by_rank(range(1, 6), "movie"))
 # base.polygon_db.close()
