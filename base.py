@@ -27,7 +27,7 @@ class PolygonFrameBase:
         self.master = master
         self.widget_frame = tk.Frame(self.master, bg = c.COLOUR_BACKGROUND)
         """ Draw logo"""
-        with Image.open(".\common\logo.png") as image:
+        with Image.open(c.LOGO_PATH) as image:
             self.img_logo = ImageTk.PhotoImage(image.resize((145, 145)))
             self.img_logo_padded = ImageTk.PhotoImage(
                 pad_image_with_transparency(
