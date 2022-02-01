@@ -10,6 +10,7 @@ sys.path.append("D:\\Users\\Marcus\\Documents\\R Documents\\Coding\\Python\\Pack
 import tkinter as tk
 from widgets import TitleModule
 from datetime import datetime
+import re
 
 from mh_logging import log_class
 import tk_arrange as tka
@@ -173,6 +174,86 @@ class Padding(tk.Label):
         kwargs["text"] = ""
         super().__init__(master, *args, **kwargs)
 
+class RequestFilmWindow(tk.Toplevel):
+    """ Window to get user film input, either as an IMDb ID or by searching for
+    a film title """
+    def __init__(self, master, *args, **kwargs):
+        self.master = master
+        super().__init__(master, *args, **kwargs)
+
+        self.primary_search_frame = tk.Frame(self, bg = c.COLOUR_FILM_BACKGROUND)
+        self.text = tk.Label(
+            self.primary_search_frame, fg = c.COLOUR_OFFWHITE_TEXT,
+            font = ("Helvetica, 24"), bg = c.COLOUR_FILM_BACKGROUND,
+            text = "Enter an IMDb ID or search for a film title:"
+            )
+        self.text.bind("<Return>", self.search)
+
+        self.search_trim = base.TrimmedFrame(self.primary_search_frame, height = 20)
+        self.search_trim.outer.config(highlightthickness = 4)
+        self.search_text = tk.Entry(
+            self.search_trim.inner, width = 20, font = ("Helvetica", 16)
+            )
+        self.search_trim.columnconfigure(0, weight = 1)
+        self.search_text.grid(row = 0, column = 0, **c.GRID_STICKY)
+
+        self.btn_search = tk.Button(
+            self.primary_search_frame, command = self.search, text = "Search",
+            font = ("Helvetica", 24, )
+            )
+
+        widgets = {1: {'widget': self.text,
+                       'grid_kwargs': {**c.GRID_STICKY, "padx": 15, "pady": 15},
+                       'stretch_width': True},
+                   2: {'widget': self.search_trim,
+                       'grid_kwargs': {**c.GRID_STICKY, "pady": 5, "padx": 10},
+                       'stretch_width': True},
+                   3: {'widget': self.btn_search,
+                       'grid_kwargs': {**c.GRID_STICKY, "pady": 5, "padx": 10}},
+                   -1: {'widget_kwargs': {"bg": c.COLOUR_FILM_BACKGROUND}}
+                   }
+        self.primary_search_set = tka.WidgetSet(
+            self.primary_search_frame, widgets, [[1], [2], [-1, 3]]
+            )
+        self.primary_search_frame.grid(row = 0, column = 0, **c.GRID_STICKY)
+
+        # frame to hold the secondary search widgets to display search results
+        self.secondary_search_frame = tk.Frame(
+            self, bg = c.COLOUR_FILM_BACKGROUND
+            )
+        self.protocol("WM_DELETE_WINDOW", self.destroy)
+
+    def search(self, *args, **kwargs):
+        """ Called from btn_search """
+        search_text = self.search_text.get().strip()
+        if self.is_imdb_id(search_text):
+            self.user_input = search_text
+        else:
+            pass #TODO search imdb for the text
+
+    def is_imdb_id(self, text):
+        """ Return bool, if text is formatted like an IMDb ID. This says
+        nothing about if it is a *valid* ID or not. """
+        # remove leading "tt"
+        if text[0:2] == "tt":
+            text = text[2:]
+        # test for 7/8 digit number (imdb title ID)
+        if re.match("\d{7,8}", text):
+            return True
+        else:
+            return False
+
+    def start(self):
+        self.master.eval('tk::PlaceWindow %s center' % str(self))
+        self.attributes('-topmost', 'true')
+        self.transient(self.master)
+        self.grab_set()
+        self.mainloop()
+
+    def get_input(self):
+        """ Return user input """
+        return self.user_input
+
 class FilmTracker:
     @log_class
     def __init__(self, master):
@@ -293,7 +374,6 @@ class FilmTracker:
     def end_startup(self, *args, **kwargs):
         self._during_startup = False
 
-
     @log_class
     def get_ranked_entries(self):
         self.ranked_entries = imdbf.get_entry_by_rank(
@@ -342,6 +422,8 @@ class FilmTracker:
 
     @log_class
     def add_new(self, *args, **kwargs):
+        film_request = RequestFilmWindow(self.master)
+        film_request.start()
         raise NotImplementedError
 
     @log_class
