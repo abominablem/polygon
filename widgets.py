@@ -15,7 +15,7 @@ import tk_arrange as tka
 from mh_logging import log_class
 import constants as c
 import futil as futil
-from base import TrimmedFrame
+import base
 
 log_class = log_class(c.LOG_LEVEL)
 
@@ -163,7 +163,7 @@ class TitleModule(tk.Frame):
         font_rewatch = ("Calibri", 36)
         font_number = ("Calibri", 36)
 
-        self.border_frame = TrimmedFrame(self)
+        self.border_frame = base.TrimmedFrame(self)
         self.border_frame.columnconfigure(0, weight = 1)
 
         self.widget_frame = tk.Frame(self.border_frame.inner)
@@ -241,12 +241,17 @@ class TitleModule(tk.Frame):
             self.rating_frame, widgets, layout = [[1], [2], [3]])
         self.rating_frame.grid(row = 0, column = 1, **c.GRID_STICKY)
 
+        widgets = {2: {'widget': self.border_frame,
+                       'grid_kwargs': c.GRID_STICKY,
+                       'stretch_width': True,},
+                   }
         self.include_number = include_number
         if include_number:
             self.number = tk.Label(
                 self, bg = c.COLOUR_FILM_BACKGROUND, anchor = "e",
                 font = font_number, padx = 40, fg = "white", width = 4
                 )
+            widgets[1] = {'widget': self.number, 'grid_kwargs': c.GRID_STICKY}
 
         self.include_rewatch = include_rewatch
         if include_rewatch:
@@ -254,16 +259,10 @@ class TitleModule(tk.Frame):
                 self, bg = c.COLOUR_FILM_BACKGROUND, anchor = "center",
                 font = font_rewatch, padx = 40, fg = "white", text = "⟳"
                 )
+            widgets[3] = {'widget': self.rewatch, 'grid_kwargs': c.GRID_STICKY}
 
-        widgets = {1: {'widget': self.number,
-                       'grid_kwargs': c.GRID_STICKY,},
-                   2: {'widget': self.border_frame,
-                       'grid_kwargs': c.GRID_STICKY,
-                       'stretch_width': True,},
-                   3: {'widget': self.rewatch,
-                       'grid_kwargs': c.GRID_STICKY,},
-                   }
-        self.widgets = tka.WidgetSet(self, widgets, layout = [1,2,3])
+        layout = sorted(list(widgets.keys()))
+        self.widgets = tka.WidgetSet(self, widgets, layout = layout)
 
     @log_class
     def format_runtime(self, runtime):
@@ -316,6 +315,160 @@ class TitleModule(tk.Frame):
 
             else:
                 self.__dict__[kw].config(text = kwargs[kw])
+
+class Counter(tk.Frame):
+    @log_class
+    def __init__(self, master, *args, **kwargs):
+        super().__init__(master, *args, **kwargs)
+        self.counter_frame = base.TrimmedFrame(self)
+        self.counter_frame.grid(row = 0, column = 0, **c.GRID_STICKY)
+        self.counter_frame.columnconfigure(0, weight = 1)
+        self.counter_frame.rowconfigure(0, weight = 1)
+
+        self._pixel = tk.PhotoImage(width = 1, height = 1)
+
+        font_icon = ("Calibri", 40)
+        font_count = ("Calibri", 36)
+        self.icon = tk.Label(
+            self.counter_frame.inner, text = "#", font = font_icon,
+            padx = 15, image = self._pixel, compound = "center", width = 40
+            )
+        self.icon.grid(row = 0, column = 0, **c.GRID_STICKY)
+        self.counter_frame.inner.columnconfigure(0, weight = 1)
+        self.counter_frame.inner.rowconfigure(0, weight = 1)
+
+        self.counter = tk.Label(
+            self.counter_frame.inner, text = "0", font = font_count,
+            padx = 25, image = self._pixel, compound = "center", width = 130
+            )
+        self.counter.grid(row = 0, column = 1, **c.GRID_STICKY)
+        self.counter_frame.inner.columnconfigure(1, weight = 1)
+
+        self.rowconfigure(0, weight = 1)
+
+    @log_class
+    def set_counter(self, count):
+        self.counter.config(text = count)
+
+    @log_class
+    def set_icon(self, type):
+        if type == "count":
+            self.icon.config(text = "#")
+        elif type == "time":
+            self.icon.config(text = "")
+        else:
+            raise ValueError
+
+class RangeDisplay(tk.Frame):
+    @log_class
+    def __init__(self, master, minimum = 1, maximum = None, mindiff = 1,
+                 *args, **kwargs):
+        """ Display a range X - Y, with both taking a minimum or maximum value
+        and with Y - X always >= mindiff (if given) """
+        super().__init__(master, *args, **kwargs)
+
+        self.minimum = -9223372036854775807 if minimum is None else minimum
+        self.maximum = 9223372036854775807 if maximum is None else maximum
+        self.mindiff = mindiff
+
+        self.columnconfigure(0, weight = 1)
+        self.rowconfigure(0, weight = 1)
+
+        self.bordered_frame = base.TrimmedFrame(self)
+        self.bordered_frame.grid(row = 0, column = 0, **c.GRID_STICKY)
+        self.bordered_frame.columnconfigure(0, weight = 1)
+        self.bordered_frame.rowconfigure(0, weight = 1)
+
+        font_range = ("Calibri", 36)
+        self.range = tk.Label(
+            self.bordered_frame.inner, font = font_range, width = 11
+            )
+        self.range.columnconfigure(0, weight = 1)
+        self.range.rowconfigure(0, weight = 1)
+        self.range.grid(row = 0, column = 0, **c.GRID_STICKY)
+
+        self.lower, self.upper = 1, 5
+        self.set_range(self.lower, self.upper)
+
+    @log_class
+    def set_range(self, lower = None, upper = None):
+        if not lower is None: self.lower = lower
+        if not upper is None: self.upper = upper
+        self.range.config(text = '%s - %s' % (self.lower, self.upper))
+
+    @log_class
+    def set_maximum(self, maximum):
+        self.maximum = maximum
+        if self.upper > maximum:
+            self.increment(maximum - self.upper)
+
+    @log_class
+    def set_minimum(self, minimum):
+        self.minimum = minimum
+        if self.lower < minimum:
+            self.increment(self.lower - minimum)
+
+    @log_class
+    def set_increment(self, increment):
+        self.increment = increment
+        upper = self.enforce_bounds(self.lower + increment)
+        self.set_range(upper = upper)
+
+    @log_class
+    def increment(self, increment):
+        lower = self.enforce_bounds(self.lower + increment)
+        upper = self.enforce_bounds(self.upper + increment)
+        if upper - lower < self.mindiff:
+            upper = self.enforce_bounds(lower + self.mindiff)
+            lower = self.enforce_bounds(upper - self.mindiff)
+        self.set_range(lower, upper)
+
+    @log_class
+    def enforce_bounds(self, value):
+        return max(self.minimum, min(self.maximum, value))
+
+    @log_class
+    def get_range(self):
+        return range(self.lower, self.upper + 1)
+
+class PolygonButton(tk.Button):
+    @log_class
+    def __init__(self, master, pixels = True, toggleable = False,
+                 *args, **kwargs):
+        if pixels:
+            self._pixel = tk.PhotoImage(width = 1, height = 1)
+            kwargs.setdefault("image", self._pixel)
+            kwargs.setdefault("compound", "center")
+        kwargs.setdefault("font", ("Helvetica", 36))
+        kwargs.setdefault("padx", 10)
+        kwargs.setdefault("fg", "black")
+        super().__init__(master, *args, **kwargs)
+
+        self.toggleable = toggleable
+        if toggleable:
+            self.bind("<1>", self._click)
+            self.toggle_on = False
+
+    @log_class
+    def _click(self, *args, **kwargs):
+        self.toggle_on = not self.toggle_on
+        if self.toggle_on:
+            self.config(fg = "lime green")
+        else:
+            self.config(fg = "black")
+
+class Padding(tk.Label):
+    @log_class
+    def __init__(self, master, pixels = True, *args, **kwargs):
+        if pixels:
+            self._pixel = tk.PhotoImage(width = 1, height = 1)
+            kwargs.setdefault("image", self._pixel)
+        kwargs["bg"] = c.COLOUR_FILM_BACKGROUND
+        kwargs["text"] = ""
+        super().__init__(master, *args, **kwargs)
+
+
+
 
 # test = "RatingDisplay"
 test = "TitleModule"
