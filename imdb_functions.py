@@ -37,7 +37,6 @@ class Title:
         if not title_id is None:
             self.clear()
             movie = imdb.get_movie(clean_id(title_id))
-            imdb.update(movie, "akas")
             self._data_from_object(movie)
 
         if not detail is None:
@@ -60,6 +59,9 @@ class Title:
     @log_class
     def _data_from_object(self, movie):
         self.title_id = standardise_id(movie.getID())
+
+        imdb.update(movie, ["akas", "main"])
+
         self._title = movie
         self._data = self._title.data
 
@@ -433,7 +435,7 @@ class IMDbFunctions:
         if type is None:
             pass
         elif type == "movie":
-            inner_filters.append("type IN ('movie', 'tv movie')")
+            inner_filters.append("type IN ('%s')" % "', '".join(c.MOVIE_TYPES))
         else:
             raise ValueError("Invalid type")
 
@@ -489,6 +491,35 @@ class IMDbFunctions:
             result_dict["number"] = rank
             results_dict_all[rank] = result_dict
         return results_dict_all
+
+    def _search_object_to_dict(self, search_obj):
+        obj_dict = {
+            key: search_obj.data.get(key, "") for key in
+            ["title", "kind", "year", "episode of", "series year", "season",
+             "episode"]
+            }
+        obj_dict["title_id"] = search_obj.getID()
+        obj_dict["type"] = obj_dict["kind"]
+        return obj_dict
+
+    def search_title(self, search_text, type = None):
+        """ Return search results for some search_text. Optionally filter by
+        title type """
+        search_results = imdb.search_movie(search_text)
+        if not type is None:
+            try:
+                type_filter = {"movie": c.MOVIE_TYPES, "tv": c.TV_TYPES,
+                               "episode": ["episode"]}[type]
+            except KeyError:
+                if not isinstance(type, list): type_filter = [type]
+
+            results_filtered = [movie for movie in search_results
+                                if movie.data["kind"] in type_filter]
+        else:
+            results_filtered = search_results
+        return [self._search_object_to_dict(movie)
+                for movie in results_filtered]
+
 
 class IMDbBaseTitleFunctions:
     """ Base class for function classes editing the titles table """
@@ -738,8 +769,6 @@ class IMDbEntryFunctions:
         return result["entry_id"]
 
 
-# imdbf = IMDbFunctions()
-# # imdbf.add_entry(title_id = 'tt0093431', entry_date = '2022-01-30', rating = 6, rewatch = False, tags  = {'platform': 'Download'})
-# # imdbf.add_title("tt13146488")
-# # print(imdbf.get_entry_by_rank(range(1, 6), "movie"))
+imdbf = IMDbFunctions()
+# # imdbf.add_entry(title_id = 'tt13984924', entry_date = '2022-01-31', rating = 7, rewatch = False, tags  = {'platform': 'Download'})
 # base.polygon_db.close()
