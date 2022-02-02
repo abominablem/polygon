@@ -108,3 +108,4 @@ LBL_STD_ARGS = {
 
 """ IMDB CONSTANTS """
 TV_TYPES = ['tv series', 'tv mini series']
+MOVIE_TYPES = ['movie', 'tv movie']
