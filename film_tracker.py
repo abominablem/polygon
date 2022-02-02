@@ -8,175 +8,25 @@ Created on Wed Jan 26 22:10:31 2022
 import sys
 sys.path.append("D:\\Users\\Marcus\\Documents\\R Documents\\Coding\\Python\\Packages")
 import tkinter as tk
-from widgets import TitleModule
+from widgets import TitleModule, Counter, Padding, RangeDisplay, PolygonButton
 from datetime import datetime
 import re
 
 from mh_logging import log_class
 import tk_arrange as tka
+import described_widgets as dw
 import constants as c
 import base
-import imdb_functions
+from imdb_functions import imdbf
 
-imdbf = imdb_functions.IMDbFunctions()
 log_all = log_class("all")
 log_min = log_class("min")
 log_class = log_class(c.LOG_LEVEL)
 
-class FilmCounter(tk.Frame):
-    @log_class
-    def __init__(self, master, *args, **kwargs):
-        super().__init__(master, *args, **kwargs)
-        self.counter_frame = base.TrimmedFrame(self)
-        self.counter_frame.grid(row = 0, column = 0, **c.GRID_STICKY)
-        self.counter_frame.columnconfigure(0, weight = 1)
-        self.counter_frame.rowconfigure(0, weight = 1)
-
-        self._pixel = tk.PhotoImage(width = 1, height = 1)
-
-        font_icon = ("Calibri", 40)
-        font_count = ("Calibri", 36)
-        self.icon = tk.Label(
-            self.counter_frame.inner, text = "#", font = font_icon,
-            padx = 15, image = self._pixel, compound = "center", width = 40
-            )
-        self.icon.grid(row = 0, column = 0, **c.GRID_STICKY)
-        self.counter_frame.inner.columnconfigure(0, weight = 1)
-        self.counter_frame.inner.rowconfigure(0, weight = 1)
-
-        self.counter = tk.Label(
-            self.counter_frame.inner, text = "0", font = font_count,
-            padx = 25, image = self._pixel, compound = "center", width = 130
-            )
-        self.counter.grid(row = 0, column = 1, **c.GRID_STICKY)
-        self.counter_frame.inner.columnconfigure(1, weight = 1)
-
-        self.rowconfigure(0, weight = 1)
-
-    @log_class
-    def set_counter(self, count):
-        self.counter.config(text = count)
-
-    @log_class
-    def set_icon(self, type):
-        if type == "count":
-            self.icon.config(text = "#")
-        elif type == "time":
-            self.icon.config(text = "")
-        else:
-            raise ValueError
-
-class RangeDisplay(tk.Frame):
-    @log_class
-    def __init__(self, master, minimum = 1, maximum = None, mindiff = 1,
-                 *args, **kwargs):
-        """ Display a range X - Y, with both taking a minimum or maximum value
-        and with Y - X always >= mindiff (if given) """
-        super().__init__(master, *args, **kwargs)
-
-        self.minimum = -9223372036854775807 if minimum is None else minimum
-        self.maximum = 9223372036854775807 if maximum is None else maximum
-        self.mindiff = mindiff
-
-        self.columnconfigure(0, weight = 1)
-        self.rowconfigure(0, weight = 1)
-
-        self.bordered_frame = base.TrimmedFrame(self)
-        self.bordered_frame.grid(row = 0, column = 0, **c.GRID_STICKY)
-        self.bordered_frame.columnconfigure(0, weight = 1)
-        self.bordered_frame.rowconfigure(0, weight = 1)
-
-        font_range = ("Calibri", 36)
-        self.range = tk.Label(
-            self.bordered_frame.inner, font = font_range, width = 11
-            )
-        self.range.columnconfigure(0, weight = 1)
-        self.range.rowconfigure(0, weight = 1)
-        self.range.grid(row = 0, column = 0, **c.GRID_STICKY)
-
-        self.lower, self.upper = 1, 5
-        self.set_range(self.lower, self.upper)
-
-    @log_class
-    def set_range(self, lower = None, upper = None):
-        if not lower is None: self.lower = lower
-        if not upper is None: self.upper = upper
-        self.range.config(text = '%s - %s' % (self.lower, self.upper))
-
-    @log_class
-    def set_maximum(self, maximum):
-        self.maximum = maximum
-        if self.upper > maximum:
-            self.increment(maximum - self.upper)
-
-    @log_class
-    def set_minimum(self, minimum):
-        self.minimum = minimum
-        if self.lower < minimum:
-            self.increment(self.lower - minimum)
-
-    @log_class
-    def set_increment(self, increment):
-        self.increment = increment
-        upper = self.enforce_bounds(self.lower + increment)
-        self.set_range(upper = upper)
-
-    @log_class
-    def increment(self, increment):
-        lower = self.enforce_bounds(self.lower + increment)
-        upper = self.enforce_bounds(self.upper + increment)
-        if upper - lower < self.mindiff:
-            upper = self.enforce_bounds(lower + self.mindiff)
-            lower = self.enforce_bounds(upper - self.mindiff)
-        self.set_range(lower, upper)
-
-    @log_class
-    def enforce_bounds(self, value):
-        return max(self.minimum, min(self.maximum, value))
-
-    @log_class
-    def get_range(self):
-        return range(self.lower, self.upper + 1)
-
-class PolygonButton(tk.Button):
-    @log_class
-    def __init__(self, master, pixels = True, toggleable = False,
-                 *args, **kwargs):
-        if pixels:
-            self._pixel = tk.PhotoImage(width = 1, height = 1)
-            kwargs.setdefault("image", self._pixel)
-            kwargs.setdefault("compound", "center")
-        kwargs.setdefault("font", ("Helvetica", 36))
-        kwargs.setdefault("padx", 10)
-        kwargs.setdefault("fg", "black")
-        super().__init__(master, *args, **kwargs)
-
-        self.toggleable = toggleable
-        if toggleable:
-            self.bind("<1>", self._click)
-            self.toggle_on = False
-
-    @log_class
-    def _click(self, *args, **kwargs):
-        self.toggle_on = not self.toggle_on
-        if self.toggle_on:
-            self.config(fg = "lime green")
-        else:
-            self.config(fg = "black")
-
-class Padding(tk.Label):
-    @log_class
-    def __init__(self, master, pixels = True, *args, **kwargs):
-        if pixels:
-            self._pixel = tk.PhotoImage(width = 1, height = 1)
-            kwargs.setdefault("image", self._pixel)
-        kwargs["bg"] = c.COLOUR_FILM_BACKGROUND
-        kwargs["text"] = ""
-        super().__init__(master, *args, **kwargs)
-
 class RequestFilmWindow(tk.Toplevel):
     """ Window to get user film input, either as an IMDb ID or by searching for
     a film title """
+    @log_class
     def __init__(self, master, *args, **kwargs):
         self.master = master
         super().__init__(master, *args, **kwargs)
@@ -197,6 +47,10 @@ class RequestFilmWindow(tk.Toplevel):
         self.search_trim.columnconfigure(0, weight = 1)
         self.search_text.grid(row = 0, column = 0, **c.GRID_STICKY)
 
+        self.btn_close = tk.Button(
+            self.primary_search_frame, command = self.destroy, text = "Close",
+            font = ("Helvetica", 24, )
+            )
         self.btn_search = tk.Button(
             self.primary_search_frame, command = self.search, text = "Search",
             font = ("Helvetica", 24, )
@@ -208,12 +62,14 @@ class RequestFilmWindow(tk.Toplevel):
                    2: {'widget': self.search_trim,
                        'grid_kwargs': {**c.GRID_STICKY, "pady": 5, "padx": 10},
                        'stretch_width': True},
-                   3: {'widget': self.btn_search,
-                       'grid_kwargs': {**c.GRID_STICKY, "pady": 5, "padx": 10}},
+                   3: {'widget': self.btn_close,
+                       'grid_kwargs': {**c.GRID_STICKY, "pady": 5, "padx": 5}},
+                   4: {'widget': self.btn_search,
+                       'grid_kwargs': {**c.GRID_STICKY, "pady": 5, "padx": 5}},
                    -1: {'widget_kwargs': {"bg": c.COLOUR_FILM_BACKGROUND}}
                    }
         self.primary_search_set = tka.WidgetSet(
-            self.primary_search_frame, widgets, [[1], [2], [-1, 3]]
+            self.primary_search_frame, widgets, [[1], [2], [3, 4]]
             )
         self.primary_search_frame.grid(row = 0, column = 0, **c.GRID_STICKY)
 
@@ -221,16 +77,65 @@ class RequestFilmWindow(tk.Toplevel):
         self.secondary_search_frame = tk.Frame(
             self, bg = c.COLOUR_FILM_BACKGROUND
             )
+        self.search_results = dw.SimpleTreeview(
+            self.secondary_search_frame,
+            colsdict = {1: {"header": "", "width": 1,
+                            "stretch": True, "anchor": "w"},
+                        2: {"header": "Type", "width": 50,
+                            "stretch": False, "anchor": "center"},
+                        3: {"header": "Title", "width": 500,
+                            "stretch": True, "anchor": "w"},}
+            )
+        self.search_results.bind("<Double-1>", self.select_search_result)
+        self.search_results.grid(row = 0, column = 0, pady = (5, 15), padx = 10)
+        self.secondary_search_frame.columnconfigure(0, weight = 1)
+        self.secondary_search_frame.rowconfigure(0, weight = 1)
+
         self.protocol("WM_DELETE_WINDOW", self.destroy)
 
+    @log_class
     def search(self, *args, **kwargs):
         """ Called from btn_search """
         search_text = self.search_text.get().strip()
         if self.is_imdb_id(search_text):
-            self.user_input = search_text
+            self.set_value(search_text)
         else:
-            pass #TODO search imdb for the text
+            search_results = imdbf.search_title(search_text, type = "movie")
+            self.load_search_results(search_results)
+            self.add_secondary_search_widgets()
 
+    @log_class
+    def add_secondary_search_widgets(self):
+        self.secondary_search_frame.grid(row = 1, column = 0, **c.GRID_STICKY)
+
+    @log_class
+    def _search_results_values(self, res_dict):
+        " Episode/Series number "
+        episode = ("E%02d" % int(res_dict["episode"])
+                   if res_dict["episode"] != "" else "")
+        season = ("S%02d" % int(res_dict["season"])
+                  if res_dict["season"] != "" else "")
+        series_ending = (" (%s : %s%s)" % (res_dict["episode of"], season, episode)
+                         if episode != "" else "")
+
+        title = res_dict["title"] + series_ending + " (%s)" % res_dict["year"]
+        return [res_dict["type"], title]
+
+    @log_class
+    def load_search_results(self, results):
+        self.search_results.clear()
+        for i, result_dict in enumerate(results):
+            self.search_results.insert(
+                '', 'end', iid = result_dict["title_id"],
+                values = self._search_results_values(result_dict)
+                )
+
+    @log_class
+    def select_search_result(self, *args, **kwargs):
+        title_id = self.search_results.events["<Double-1>"]["row"]
+        self.set_value(title_id)
+
+    @log_class
     def is_imdb_id(self, text):
         """ Return bool, if text is formatted like an IMDb ID. This says
         nothing about if it is a *valid* ID or not. """
@@ -243,14 +148,22 @@ class RequestFilmWindow(tk.Toplevel):
         else:
             return False
 
+    @log_class
     def start(self):
         self.master.eval('tk::PlaceWindow %s center' % str(self))
-        self.attributes('-topmost', 'true')
+        self.lift()
+        # self.attributes('-topmost', 'true')
         self.transient(self.master)
         self.grab_set()
         self.mainloop()
 
-    def get_input(self):
+    @log_class
+    def set_value(self, value):
+        self.user_input = value
+        self.event_generate("<<SetValue>>")
+
+    @log_class
+    def get_value(self):
         """ Return user input """
         return self.user_input
 
@@ -264,7 +177,7 @@ class FilmTracker:
         self.header_frame = tk.Frame(
             self.master, bg = c.COLOUR_FILM_BACKGROUND
             )
-        self.counter = FilmCounter(
+        self.counter = Counter(
             self.header_frame, bg = c.COLOUR_FILM_BACKGROUND,
             height = c.DM_FILM_HEADER_HEIGHT
             )
@@ -368,6 +281,8 @@ class FilmTracker:
         self._last_configured = datetime.min
         self._bind_configure()
 
+        # allow time for widgets to be placed and settle before formally
+        # ending startup
         self.master.after(1000, self.end_startup)
 
     @log_class
@@ -388,11 +303,12 @@ class FilmTracker:
         self.count_films = imdbf.db.entries.select(
             """ SELECT COUNT(DISTINCT e.title_id) FROM entries e INNER JOIN
             titles t ON e.title_id = t.title_id WHERE t.type IN
-            ('movie', 'tv movie') """)[0][0]
+            ('%s') """ % "', '".join(c.MOVIE_TYPES))[0][0]
         self.count_entries = imdbf.db.entries.select(
             """ SELECT COUNT(*) FROM entries e INNER JOIN
             titles t ON e.title_id = t.title_id WHERE t.type IN
-            ('movie', 'tv movie') AND e.entry_date IS NOT NULL""")[0][0]
+            ('%s') AND e.entry_date IS NOT NULL"""
+            % "', '".join(c.MOVIE_TYPES))[0][0]
 
     @log_class
     def set_counter_range(self):
@@ -422,9 +338,15 @@ class FilmTracker:
 
     @log_class
     def add_new(self, *args, **kwargs):
-        film_request = RequestFilmWindow(self.master)
-        film_request.start()
-        raise NotImplementedError
+        self.film_request = RequestFilmWindow(self.master)
+        self.film_request.bind("<<SetValue>>", self.log_entry)
+        self.film_request.start()
+
+    @log_class
+    def log_entry(self, event):
+        title_id = self.film_request.get_value()
+        self.film_request.destroy()
+        print(title_id) #TODO launch log entry window
 
     @log_class
     def toggle_rewatch(self, *args, **kwargs):
@@ -534,7 +456,7 @@ class FilmTracker:
             return False
         # or remove until max number is reached
         else:
-            removals = [i for i in self.title_modules if i + 1 >= num_titlemods]
+            removals = [i for i in self.title_modules if i+1 >= num_titlemods]
             for i in removals:
                 self.remove_title_module(i)
             return True
