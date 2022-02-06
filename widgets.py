@@ -16,6 +16,7 @@ from mh_logging import log_class
 import constants as c
 import futil as futil
 import base
+import math
 
 log_class = log_class(c.LOG_LEVEL)
 
@@ -108,8 +109,10 @@ class RatingDisplay(tk.Text):
     @log_class
     def _set_colour_tags(self):
         """ Colour the text according to rules defined so far """
-        colfill = self.colour_map.get(self.rating, {}).get("filled_colour", self._colour_filled)
-        colempty = self.colour_map.get(self.rating, {}).get("empty_colour", self._colour_empty)
+        colfill = self.colour_map.get(self.rating, {}).get(
+            "filled_colour", self._colour_filled)
+        colempty = self.colour_map.get(self.rating, {}).get(
+            "empty_colour", self._colour_empty)
         self.tag_config("filled_rating", foreground = colfill)
         self.tag_config("empty_rating", foreground = colempty)
 
@@ -129,7 +132,8 @@ class RatingDisplay(tk.Text):
         self._clear()
         self._set_colour_tags()
         self.configure(state='normal')
-        self.insert("end", self._symbol_filled * rating, ["filled_rating", 'center'])
+        self.insert("end", self._symbol_filled * rating,
+                    ["filled_rating", 'center'])
         self.insert("end", self._symbol_empty * (self.max_rating - rating),
                     ["empty_rating", 'center'])
         self.configure(state='disabled')
@@ -146,6 +150,31 @@ class RatingDisplay(tk.Text):
         for kw in kws:
             if kw in dict: del dict[kw]
         return dict
+
+    @log_class
+    def enforce_bounds(self, value):
+        return max(self.min_rating, min(self.max_rating, value))
+
+    @log_class
+    def get_mouseover_rating(self, event):
+        x, y = event.x, event.y
+        text_width = self._get_current_width()
+        widget_width = self.winfo_width()
+        x_offset = int((widget_width - text_width)/2)
+        x -= x_offset
+        symbol_filled_width = self.font.measure(self._symbol_filled)
+        hovered_rating = math.ceil(x / symbol_filled_width)
+        return hovered_rating
+
+    @log_class
+    def set_mouseover_rating(self, event):
+        new_rating = self.get_mouseover_rating(event)
+        self.set(self.enforce_bounds(new_rating))
+
+    @log_class
+    def _get_current_width(self):
+        """ Get the width of the text currently inside the widget """
+        return self.font.measure(self.get('0.1', 'end').strip())
 
 
 class TitleModule(tk.Frame):
