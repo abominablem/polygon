@@ -121,3 +121,4 @@ common/img_325286.png
 testing.py
 *.xcf
 *.png
+*.db
