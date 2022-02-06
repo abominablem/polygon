@@ -116,3 +116,8 @@ dmypy.json
 *.svg
 *.xlsx
 sql_setup.py
+common/tag.png
+common/img_325286.png
+testing.py
+*.xcf
+*.png
