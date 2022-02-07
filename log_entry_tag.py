@@ -23,7 +23,7 @@ def rounded_line(draw, coords, fill, width, **kwargs):
 def tag(width, height, fill = "black", line_width = 15,
         background = (0, 0, 0, 0), interior = "#F3F3F3"):
     """ Return an image of a tag shaped object """
-    assert width >= height * 3
+    # assert width >= height * 3
 
     offset = line_width / 2
     if offset != int(offset):
@@ -88,16 +88,30 @@ def _text_tag(text, text_colour = "black", x_colour = "black", fill = "black",
               font = font_remove, fill = x_colour)
     return image
 
-def text_tag(text, width = 1000, **kwargs):
+def text_tag(text, height = 300, **kwargs):
+    """ Return an image of a tag shaped object containing a given text string
+    and X, fixing a given height and varying the width based on the length of
+    the string """
     image = _text_tag(text, **kwargs)
     img_width, img_height = image.size
     aspect = img_width / img_height
-    height = int(width / aspect)
-    image = image.resize((width, height), resample=Image.ANTIALIAS)
+    width = int(height * aspect)
+    image = image.resize((width, height), resample = Image.ANTIALIAS)
+
+    # force all translucent pixels to be fully opaque
+    # this prevents an issue with anti aliasing slightly darkening the
+    # background around the edges of lines and keeping it visible
+    pixels = image.load()
+    for px in range(image.width):
+        for py in range(image.height):
+            if pixels[px, py][3] > 0:
+                r, g, b, a = pixels[px, py]
+                pixels[px, py] = (r, g, b, 255)
+
     return image
 
 if __name__ == "__main__":
     tag = text_tag("cost: £7.45", interior = "#808080",
                    text_colour = "white", x_colour = "#D3D3D3",
-                   width = 250)
+                   height = 250)
     tag.show()
