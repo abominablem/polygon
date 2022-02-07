@@ -77,6 +77,12 @@ class RatingDisplay(tk.Text):
         self.set(self.rating)
 
     @log_class
+    def set_range(self, min = None, max = None):
+        """ Set the symbols for filled and empty rating symbols """
+        if not min is None: self.min_rating = min
+        if not max is None: self.max_rating = max
+
+    @log_class
     def set_symbol(self, empty_symbol = None, filled_symbol = None):
         """ Set the symbols for filled and empty rating symbols """
         if not empty_symbol is None: self._symbol_empty = empty_symbol
@@ -93,7 +99,8 @@ class RatingDisplay(tk.Text):
         """ Dictionary map from score to colour. Dictionary values should be
         either 1) Dictionaries with keys "empty_colour" and "filled_colour"
         (missing keys will revert to the defaults) or 2) string colour for
-        "filled_colour". "empty_colour" will revert to the default. """
+        "filled_colour" - "empty_colour" will revert to the default in this
+        case. """
 
         for rating in colour_map:
             col_def = colour_map[rating]
@@ -176,7 +183,6 @@ class RatingDisplay(tk.Text):
         """ Get the width of the text currently inside the widget """
         return self.font.measure(self.get('0.1', 'end').strip())
 
-
 class TitleModule(tk.Frame):
     """ Bordered frame containing Date, Title, Original title, Director, Year,
     Runtime, and Rating """
@@ -185,6 +191,7 @@ class TitleModule(tk.Frame):
                  **kwargs):
         self.master = master
         super().__init__(self.master, **kwargs)
+
         font_date = ("Calibri", 28, "bold")
         font_title = ("Calibri", 32)
         font_subtitle = ("Calibri", 22, "italic")
