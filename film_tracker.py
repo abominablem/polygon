@@ -30,11 +30,12 @@ class RequestFilmWindow(tk.Toplevel):
     def __init__(self, master, *args, **kwargs):
         self.master = master
         super().__init__(master, *args, **kwargs)
+        self.master.eval(f'tk::PlaceWindow {self} center')
 
         self.primary_search_frame = tk.Frame(self, bg = c.COLOUR_FILM_BACKGROUND)
         self.text = tk.Label(
             self.primary_search_frame, fg = c.COLOUR_OFFWHITE_TEXT,
-            font = ("Helvetica, 24"), bg = c.COLOUR_FILM_BACKGROUND,
+            font = ("Helvetica", 24), bg = c.COLOUR_FILM_BACKGROUND,
             text = "Enter an IMDb ID or search for a film title:"
             )
         self.text.bind("<Return>", self.search)
@@ -152,7 +153,6 @@ class RequestFilmWindow(tk.Toplevel):
     def start(self):
         self.master.eval('tk::PlaceWindow %s center' % str(self))
         self.lift()
-        # self.attributes('-topmost', 'true')
         self.transient(self.master)
         self.grab_set()
         self.mainloop()
@@ -483,6 +483,7 @@ class FilmTracker:
 if __name__ == "__main__":
     root = tk.Tk()
     root.configure(bg = c.COLOUR_FILM_BACKGROUND, pady = 30)
+    # root.overrideredirect(True)
     root.columnconfigure(0, weight = 1)
     ft = FilmTracker(root)
     root.mainloop()
