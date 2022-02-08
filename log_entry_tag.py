@@ -97,7 +97,36 @@ def text_tag(text, height = 300, **kwargs):
     aspect = img_width / img_height
     width = int(height * aspect)
     image = image.resize((width, height), resample = Image.ANTIALIAS)
+    image = force_opacity(image)
+    return image
 
+def x_image(height, colour = "black", background = (0, 0, 0, 0),
+            bordercolour = "white"):
+    image = Image.new('RGBA', (1000, 1000), color = background)
+    draw = ImageDraw.Draw(image)
+    rounded_line(draw, ((200, 200, 800, 800)), fill = bordercolour, width = 200)
+    rounded_line(draw, ((200, 800, 800, 200)), fill = bordercolour, width = 200)
+    rounded_line(draw, ((200, 200, 800, 800)), fill = colour, width = 150)
+    rounded_line(draw, ((200, 800, 800, 200)), fill = colour, width = 150)
+
+    image = image.resize((height, height), resample = Image.NEAREST)
+    image = force_opacity(image)
+    return image
+
+def tick_image(height, colour = "black", background = (0, 0, 0, 0),
+               bordercolour = "white"):
+    image = Image.new('RGBA', (1000, 1000), color = background)
+    draw = ImageDraw.Draw(image)
+    rounded_line(draw, ((200, 600, 400, 800)), fill = bordercolour, width = 200)
+    rounded_line(draw, ((400, 800, 800, 200)), fill = bordercolour, width = 200)
+    rounded_line(draw, ((200, 600, 400, 800)), fill = colour, width = 150)
+    rounded_line(draw, ((400, 800, 800, 200)), fill = colour, width = 150)
+
+    image = image.resize((height, height), resample = Image.NEAREST)
+    image = force_opacity(image)
+    return image
+
+def force_opacity(image):
     # force all translucent pixels to be fully opaque
     # this prevents an issue with anti aliasing slightly darkening the
     # background around the edges of lines and keeping it visible
@@ -107,7 +136,6 @@ def text_tag(text, height = 300, **kwargs):
             if pixels[px, py][3] > 0:
                 r, g, b, a = pixels[px, py]
                 pixels[px, py] = (r, g, b, 255)
-
     return image
 
 if __name__ == "__main__":
