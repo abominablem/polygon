@@ -18,7 +18,6 @@ import tk_arrange as tka
 import constants as c
 import base
 from imdb_functions import imdbf
-import futil
 import log_entry_tag as tagf
 
 log_class = log_class(c.LOG_LEVEL)
@@ -80,7 +79,7 @@ class TagSelection(tk.Toplevel):
 
         self.text = tk.Label(
             self.widget_frame.inner, font = ("Helvetica", 24),
-            text = "Add tags to this entry:"
+            text = "   Add tags to this entry:", anchor = "w"
             )
 
         self.tag_name = tk.StringVar(self.widget_frame.inner)
@@ -91,7 +90,7 @@ class TagSelection(tk.Toplevel):
         self.tag_name_dropdown = ttk.OptionMenu(
             self.widget_frame.inner, self.tag_name,
             "None", self.tag_name_new, *self.current_tag_names,
-            command = self.tag_name_change
+            command = self.tag_name_change, style = 'entrytag.TMenubutton'
             )
 
         self.tag_value_entry = tk.Entry(
@@ -121,15 +120,13 @@ class TagSelection(tk.Toplevel):
 
     @log_class
     def start(self, position = None):
-        self.lift()
-        self.overrideredirect(True)
-
         # set the startup position as a pixel tuple (x, y)
         if not position is None:
             geometry = "+%s+%s" % position
             self.geometry(geometry)
 
-        self.transient(self.master)
+        self.overrideredirect(True)
+        self.lift()
         self.grab_set()
         self.tag_value_entry.focus()
         self.mainloop()
@@ -176,7 +173,7 @@ class TagSelection(tk.Toplevel):
             "Input", "Enter a new tag name", parent = self
             )
         self.tag_name.set(name)
-        self.tag_value_entry.focus()
+        self.tag_value_entry.focus_force()
 
     @log_class
     def _enter_x(self, *args):
@@ -218,19 +215,17 @@ class EntryDateSelection(tk.Toplevel):
 
     @log_class
     def start(self, position = None):
-        # self.master.eval('tk::PlaceWindow %s center' % str(self))
-        self.lift()
-        self.transient(self.master)
-        self.grab_set()
-
         # set the startup position as a pixel tuple (x, y)
         if not position is None:
             geometry = "+%s+%s" % position
             self.geometry(geometry)
 
         self.overrideredirect(True)
+        self.lift()
+        self.grab_set()
         self.mainloop()
 
+    @log_class
     def get_date(self):
         return self.calendar.get_date()
 
@@ -244,7 +239,7 @@ class TitleModuleEditable(TitleModule):
                          bg = c.COLOUR_TRANSPARENT)
 
         self.rating.set_range(min = 0)
-        self.rating.set(0)
+        self.set_text(rating = 0)
         self.locked_rating = self.rating.rating
         self.rating.config(cursor = "hand2")
         self.rating.bind("<Enter>", self._enter_rating)
@@ -267,7 +262,17 @@ class TitleModuleEditable(TitleModule):
         self._tag_images = {}
         self._tag_widgets = {}
         self.tags = {}
+        self.tag_dicts = {}
         self._tag_count = 0
+
+        self.calendar_open = False
+
+    @log_class
+    def get_values(self):
+        val_dict = self.get_dict()
+        return_dict = {key: val_dict[key] for key in ["date", "rating"]}
+        return_dict["entry_tags"] = self.tags
+        return return_dict
 
     @log_class
     def _enter_rating(self, event):
@@ -279,7 +284,7 @@ class TitleModuleEditable(TitleModule):
         """ Triggered by cursor leaving rating widget """
         self._unbind_hover_rating()
         # reset the rating slightly after leaving the widget
-        self.after(100, lambda: self.rating.set(self.locked_rating))
+        self.after(100, lambda: self.set_text(rating = self.locked_rating))
 
     @log_class
     def _bind_hover_rating(self):
@@ -334,6 +339,7 @@ class TitleModuleEditable(TitleModule):
         window """
         self.add_tag_dict(name, value)
         self.add_tag_image(name, value)
+        self._increment_tag_count()
 
     @log_class
     def add_tag_dict(self, name, value):
@@ -342,6 +348,7 @@ class TitleModuleEditable(TitleModule):
             self.tags[name].append(value)
         else:
             self.tags[name] = [value]
+        self.tag_dicts[self.get_tag_count()] = {"name": name, "value": value}
 
     @log_class
     def add_tag_image(self, name, value):
@@ -380,7 +387,10 @@ class TitleModuleEditable(TitleModule):
         tag_widget.bind(
             "<ButtonRelease-1>", lambda *args: self._click_tag_widget(tag_col)
             )
-        # iterate the counter so next tag is added to next column along
+
+    @log_class
+    def _increment_tag_count(self):
+        """ Increase the tag count by one """
         self._tag_count += 1
 
     @log_class
@@ -400,7 +410,12 @@ class TitleModuleEditable(TitleModule):
     @log_class
     def _click_tag_widget(self, column):
         """ Remove widget on clicking tag """
+        if self.calendar_open:
+            return
         self.after(100, lambda: self._tag_widgets[column].grid_forget())
+        tag_dict = self.tag_dicts[column]
+        del self.tag_dicts[column]
+        self.tags[tag_dict["name"]].remove(tag_dict["value"])
 
     @log_class
     def get_tag_count(self):
@@ -418,10 +433,10 @@ class TitleModuleEditable(TitleModule):
 
     @log_class
     def launch_calendar(self):
+        self.calendar_open = True
         self.calendar = EntryDateSelection(
             self.master, bg = c.COLOUR_FILM_BACKGROUND
             )
-
         self.calendar.focus_force()
         self.calendar.bind("<Double-1>", self.get_calendar_date)
         self.calendar.bind("<Escape>", self.exit_calendar)
@@ -431,6 +446,12 @@ class TitleModuleEditable(TitleModule):
     @log_class
     def exit_calendar(self, *args):
         self.calendar.destroy()
+        # since the calendar will overlap the tags, don't indicate that the
+        # calendar is closed until shortly after it actually is. This prevents
+        # accidentally removing tags from extra clicks
+        def _make_calendar_none_(*args, **kwargs):
+            self.calendar_open = False
+        self.after(1000, _make_calendar_none_)
 
     @log_class
     def get_calendar_date(self, *args):
@@ -440,17 +461,36 @@ class TitleModuleEditable(TitleModule):
         self.after(100, self.exit_calendar())
 
 
-class LogEntryWindow(tk.Frame):
+class LogEntryWindow(tk.Toplevel):
     """ Window to log film entry """
     @log_class
     def __init__(self, master, *args, **kwargs):
         self.master = master
         super().__init__(master, *args, **kwargs)
-        self.data = TitleModuleEditable(self.master)
+
+        self.wm_attributes("-transparentcolor", c.COLOUR_TRANSPARENT)
+
+        self.data = TitleModuleEditable(self)
         self.data.grid(row = 0, column = 0, **c.GRID_STICKY)
+
+        def ret(*args):
+            print(self.data.get_values())
+
+        self.bind("<Return>", ret)
+
+    def start(self):
+        self.overrideredirect(True)
+        self.attributes('-topmost', True)
+        self.bind("<Escape>", lambda event: root.destroy())
+        self.lift()
+        self.master.eval(f'tk::PlaceWindow {self} center')
+        self.mainloop()
+
 
 if __name__  == "__main__":
     root = tk.Tk()
+    style = ttk.Style()
+    style.configure('entrytag.TMenubutton', font = ("Helvetica", 16))
     root.configure(bg = c.COLOUR_TRANSPARENT)
     log = LogEntryWindow(root, bg = c.COLOUR_TRANSPARENT)
     log.data.set_text(
@@ -458,20 +498,4 @@ if __name__  == "__main__":
             director = "Ridley Scott", original_title = "The Last Duel",
             year = 2021, runtime = "156"
             )
-    log.grid(row = 0, column = 0, **c.GRID_STICKY)
-
-    root.overrideredirect(True)
-    root.lift()
-    root.wm_attributes("-transparentcolor", c.COLOUR_TRANSPARENT)
-    root.bind("<Escape>", lambda event: root.destroy())
-    root.eval('tk::PlaceWindow . center')
-    style = ttk.Style(root)
-    style.theme_use("clam")
-
-    def log(event = None):
-        loge = TagSelection(root)
-        loge.mainloop()
-
-    root.bind("<Return>", log)
-
-    root.mainloop()
+    log.start()
