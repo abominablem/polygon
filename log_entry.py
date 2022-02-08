@@ -10,6 +10,8 @@ import tkinter as tk
 from tkinter import ttk, simpledialog
 from widgets import TitleModule
 from PIL import Image, ImageTk
+import tkcalendar as tkcal
+from datetime import datetime
 
 from mh_logging import log_class
 import tk_arrange as tka
@@ -28,27 +30,72 @@ class TagSelection(tk.Toplevel):
         self.master = master
         super().__init__(master, *args, **kwargs)
 
-        self.widget_frame = tk.Frame(self, bg = c.COLOUR_FILM_BACKGROUND)
+        self.widget_frame = base.TrimmedFrame(self)
+        self.widget_frame.grid(row = 0, column = 0, **c.GRID_STICKY)
+        self.widget_frame.rowconfigure(0, weight = 1)
+        self.widget_frame.columnconfigure(0, weight = 1)
+
+        self.x_image = {
+            "standard": ImageTk.PhotoImage(
+                tagf.x_image(height = 50, colour = "black")
+                ),
+            "hover": ImageTk.PhotoImage(
+                tagf.x_image(height = 50, colour = "gray")
+                )
+            }
+
+        self.tick_image = {
+            "standard": ImageTk.PhotoImage(
+                tagf.tick_image(height = 50, colour = "black")
+                ),
+            "hover": ImageTk.PhotoImage(
+                tagf.tick_image(height = 50, colour = "gray")
+                )
+            }
+
+        self.icon_frame = tk.Frame(self, bg = c.COLOUR_TRANSPARENT)
+        self.icon_frame.grid(row = 0, column = 1, **c.GRID_STICKY)
+
+        self.x_label = tk.Label(
+            self.icon_frame, bg = c.COLOUR_TRANSPARENT,
+            image = self.x_image["standard"], anchor = "n", cursor = "hand2"
+            )
+        self.x_label.grid(row = 0, column = 0, **c.GRID_STICKY)
+        self.x_label.bind("<Enter>", self._enter_x)
+        self.x_label.bind("<Leave>", self._leave_x)
+        self.x_label.bind("<1>", self._click_x)
+
+        label_padding = tk.Frame(self.icon_frame, bg = c.COLOUR_TRANSPARENT)
+        label_padding.grid(row = 1, column = 0, **c.GRID_STICKY)
+        self.icon_frame.rowconfigure(1, weight = 1)
+
+        self.tick_label = tk.Label(
+            self.icon_frame, bg = c.COLOUR_TRANSPARENT,
+            image = self.tick_image["standard"], anchor = "n", cursor = "hand2"
+            )
+        self.tick_label.grid(row = 2, column = 0, **c.GRID_STICKY)
+        self.tick_label.bind("<Enter>", self._enter_tick)
+        self.tick_label.bind("<Leave>", self._leave_tick)
+        self.tick_label.bind("<1>", self._click_tick)
 
         self.text = tk.Label(
-            self.widget_frame, fg = c.COLOUR_OFFWHITE_TEXT,
-            font = ("Helvetica", 24), bg = c.COLOUR_FILM_BACKGROUND,
+            self.widget_frame.inner, font = ("Helvetica", 24),
             text = "Add tags to this entry:"
             )
 
-        self.tag_name = tk.StringVar(self.widget_frame)
-        self.tag_value = tk.StringVar(self.widget_frame)
+        self.tag_name = tk.StringVar(self.widget_frame.inner)
+        self.tag_value = tk.StringVar(self.widget_frame.inner)
 
         self.current_tags = self.get_tag_combinations()
         self.current_tag_names = self.get_tag_names()
         self.tag_name_dropdown = ttk.OptionMenu(
-            self.widget_frame, self.tag_name,
+            self.widget_frame.inner, self.tag_name,
             "None", self.tag_name_new, *self.current_tag_names,
             command = self.tag_name_change
             )
 
         self.tag_value_entry = tk.Entry(
-            self.widget_frame, textvariable = self.tag_value,
+            self.widget_frame.inner, textvariable = self.tag_value,
             font = ("Helvetica", 24)
             )
 
@@ -56,32 +103,42 @@ class TagSelection(tk.Toplevel):
                        'grid_kwargs': c.GRID_STICKY,
                        'stretch_width': True},
                    2: {'widget': self.tag_name_dropdown,
-                       'grid_kwargs': {**c.GRID_STICKY, "padx": 2, "pady": 10},
+                       'grid_kwargs': {**c.GRID_STICKY, "padx": (10, 2), "pady": 10},
                        'stretch_width': True,},
                    3: {'widget': self.tag_value_entry,
-                       'grid_kwargs': {**c.GRID_STICKY, "padx": 2, "pady": 10},
+                       'grid_kwargs': {**c.GRID_STICKY, "padx": (2, 10), "pady": 10},
                        'stretch_width': True,},
                    }
 
         self.widget_set = tka.WidgetSet(
-            self.widget_frame, widgets = widgets, layout = [[1], [2, 3]]
+            self.widget_frame.inner, widgets = widgets, layout = [[1], [2, 3]]
             )
         self.widget_set.grid(row = 0, column = 0, **c.GRID_STICKY)
         self.rowconfigure(0, weight = 1)
         self.columnconfigure(0, weight = 1)
 
+        self.wm_attributes("-transparentcolor", c.COLOUR_TRANSPARENT)
+
     @log_class
-    def start(self):
-        self.master.eval('tk::PlaceWindow %s center' % str(self))
+    def start(self, position = None):
         self.lift()
+        self.overrideredirect(True)
+
+        # set the startup position as a pixel tuple (x, y)
+        if not position is None:
+            geometry = "+%s+%s" % position
+            self.geometry(geometry)
+
         self.transient(self.master)
         self.grab_set()
+        self.tag_value_entry.focus()
         self.mainloop()
 
     @log_class
     def tag_name_change(self, *args):
         if self.tag_name.get() == self.tag_name_new:
             self.ask_new_tag_name()
+        self.tag_value_entry.focus()
 
     @log_class
     def get_tag_combinations(self):
@@ -119,6 +176,63 @@ class TagSelection(tk.Toplevel):
             "Input", "Enter a new tag name", parent = self
             )
         self.tag_name.set(name)
+        self.tag_value_entry.focus()
+
+    @log_class
+    def _enter_x(self, *args):
+        self.x_label.config(image = self.x_image["hover"])
+
+    @log_class
+    def _leave_x(self, *args):
+        self.x_label.config(image = self.x_image["standard"])
+
+    @log_class
+    def _click_x(self, *args):
+        self.master.focus_force()
+        self.destroy()
+
+    @log_class
+    def _enter_tick(self, *args):
+        self.tick_label.config(image = self.tick_image["hover"])
+
+    @log_class
+    def _leave_tick(self, *args):
+        self.tick_label.config(image = self.tick_image["standard"])
+
+    @log_class
+    def _click_tick(self, *args):
+        self.event_generate("<<TickClick>>")
+
+class EntryDateSelection(tk.Toplevel):
+    @log_class
+    def __init__(self, master, *args, **kwargs):
+        self.master = master
+        super().__init__(master, *args, **kwargs)
+
+        now = datetime.now()
+        self.calendar = tkcal.Calendar(
+            self, selectmode = "day", bg = c.COLOUR_FILM_BACKGROUND,
+            year = now.year, month = now.month, day = now.day
+            )
+        self.calendar.grid(row = 0, column = 0, **c.GRID_STICKY)
+
+    @log_class
+    def start(self, position = None):
+        # self.master.eval('tk::PlaceWindow %s center' % str(self))
+        self.lift()
+        self.transient(self.master)
+        self.grab_set()
+
+        # set the startup position as a pixel tuple (x, y)
+        if not position is None:
+            geometry = "+%s+%s" % position
+            self.geometry(geometry)
+
+        self.overrideredirect(True)
+        self.mainloop()
+
+    def get_date(self):
+        return self.calendar.get_date()
 
 
 class TitleModuleEditable(TitleModule):
@@ -136,6 +250,9 @@ class TitleModuleEditable(TitleModule):
         self.rating.bind("<Enter>", self._enter_rating)
         self.rating.bind("<Leave>", self._leave_rating)
         self.rating.bind("<1>", self.lock_rating)
+
+        self.date.config(cursor = "hand2")
+        self.date.bind("<1>", self._click_date)
 
         with Image.open(r".\common\tag_outlined_thin.png") as image:
             self.tag_icon_image = ImageTk.PhotoImage(image.resize((100, 100)))
@@ -188,14 +305,27 @@ class TitleModuleEditable(TitleModule):
     @log_class
     def ask_tag(self, *args):
         """ Open an interface to select the tag name and value """
-        self.tag_window = TagSelection(root)
+        self.tag_window = TagSelection(self.master,
+                                       bg = c.COLOUR_FILM_BACKGROUND)
         self.tag_window.lift()
         self.tag_window.bind("<Return>", self.get_tag)
-        self.tag_window.start()
+        self.tag_window.bind("<<TickClick>>", self.get_tag)
+        self.tag_window.start(position = self.get_tag_startup_position())
 
+    @log_class
+    def get_tag_startup_position(self):
+        x = self.winfo_rootx() + int(self.winfo_width() * 5/7)
+        y = self.winfo_rooty() + self.winfo_height() + 10
+        return (x, y)
+
+    @log_class
     def get_tag(self, *args):
         """ Get the tag details from the open tag window, and then close it """
-        self.add_tag(**self.tag_window.get_dict())
+        tag_dict = self.tag_window.get_dict()
+        if tag_dict["value"] is None or tag_dict["value"] == "":
+            self.tag_window.destroy()
+            return
+        self.add_tag(**tag_dict)
         self.tag_window.destroy()
 
     @log_class
@@ -253,25 +383,61 @@ class TitleModuleEditable(TitleModule):
         # iterate the counter so next tag is added to next column along
         self._tag_count += 1
 
+    @log_class
     def _enter_tag_widget(self, column):
         """ Set hover image on entering tag widget """
         self._tag_widgets[column].config(
             image = self._tag_images[column]["hover"]
             )
 
+    @log_class
     def _leave_tag_widget(self, column):
         """ Set standard image on entering tag widget """
         self._tag_widgets[column].config(
             image = self._tag_images[column]["standard"]
             )
 
+    @log_class
     def _click_tag_widget(self, column):
         """ Remove widget on clicking tag """
         self.after(100, lambda: self._tag_widgets[column].grid_forget())
 
-
+    @log_class
     def get_tag_count(self):
         return self._tag_count
+
+    @log_class
+    def _click_date(self, *args):
+        self.launch_calendar()
+
+    @log_class
+    def get_calendar_startup_position(self):
+        x = self.winfo_rootx()
+        y = self.winfo_rooty() + self.winfo_height() + 10
+        return (x, y)
+
+    @log_class
+    def launch_calendar(self):
+        self.calendar = EntryDateSelection(
+            self.master, bg = c.COLOUR_FILM_BACKGROUND
+            )
+
+        self.calendar.focus_force()
+        self.calendar.bind("<Double-1>", self.get_calendar_date)
+        self.calendar.bind("<Escape>", self.exit_calendar)
+
+        self.calendar.start(position = self.get_calendar_startup_position())
+
+    @log_class
+    def exit_calendar(self, *args):
+        self.calendar.destroy()
+
+    @log_class
+    def get_calendar_date(self, *args):
+        date = self.calendar.get_date()
+        date = datetime.strptime(date, "%m/%d/%y").strftime("%Y-%m-%d")
+        self.set_text(date = date)
+        self.after(100, self.exit_calendar())
 
 
 class LogEntryWindow(tk.Frame):
