@@ -300,6 +300,12 @@ class TitleModule(tk.Frame):
         layout = sorted(list(widgets.keys()))
         self.widgets = tka.WidgetSet(self, widgets, layout = layout)
 
+        self._value_dict = {
+            "title": None, "original_title": None, "director": None,
+            "year": None, "runtime": None, "date": None, "rating": None,
+            "rewatch": None, "number": None
+            }
+
     @log_class
     def format_runtime(self, runtime):
         return futil.format_time(int(runtime), "minutes")
@@ -309,7 +315,12 @@ class TitleModule(tk.Frame):
         return datetime.strptime(date, "%Y-%m-%d").strftime("%d %b %Y")
 
     @log_class
+    def get_dict(self):
+        return self._value_dict
+
+    @log_class
     def set_text(self, **kwargs):
+        self._value_dict.update(kwargs)
         for kw in kwargs:
             if kw == "rating":
                 self.rating.set(int(kwargs[kw]))
@@ -337,8 +348,7 @@ class TitleModule(tk.Frame):
                     self.original_title.config(text = "(%s)" % text)
 
             elif kw == "date":
-                text = kwargs[kw]
-                self.date.config(text = self.format_date(text))
+                self.date.config(text = self.format_date(kwargs[kw]))
 
             elif kw == "rewatch" and self.include_rewatch:
                 if kwargs[kw]:
