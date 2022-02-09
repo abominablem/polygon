@@ -8,6 +8,7 @@ Created on Wed Jan 26 22:10:31 2022
 import sys
 sys.path.append("D:\\Users\\Marcus\\Documents\\R Documents\\Coding\\Python\\Packages")
 import tkinter as tk
+from tkinter import ttk
 from widgets import TitleModule, Counter, Padding, RangeDisplay, PolygonButton
 from datetime import datetime
 import re
@@ -18,6 +19,7 @@ import described_widgets as dw
 import constants as c
 import base
 from imdb_functions import imdbf
+from log_entry import LogEntryWindow
 
 log_all = log_class("all")
 log_min = log_class("min")
@@ -261,10 +263,7 @@ class FilmTracker:
         self.header_frame.columnconfigure(0, weight = 1)
 
         """ Get data from database """
-        self.get_ranked_entries()
-        self.get_film_counts()
-        self.range_display.set_maximum(max(self.ranked_entries))
-        self.counter.set_counter(self.count_films)
+        self.query_data()
 
         """ Create TitleModules """
         self.titlemod_frame = tk.Frame(
@@ -289,8 +288,16 @@ class FilmTracker:
     def end_startup(self, *args, **kwargs):
         self._during_startup = False
 
+    def query_data(self):
+        self.get_ranked_entries()
+        self.get_film_counts()
+        self.range_display.set_maximum(max(self.ranked_entries))
+        self.counter.set_counter(self.count_films)
+
     @log_class
     def get_ranked_entries(self):
+        """ Get dictionary of all entries, ranked in decreasing order of
+        watch date """
         self.ranked_entries = imdbf.get_entry_by_rank(
             rank = None, type = "movie", rewatch = False
             )
@@ -300,6 +307,7 @@ class FilmTracker:
 
     @log_class
     def get_film_counts(self):
+        """ Query the number of watched films and logged entries """
         self.count_films = imdbf.db.entries.select(
             """ SELECT COUNT(DISTINCT e.title_id) FROM entries e INNER JOIN
             titles t ON e.title_id = t.title_id WHERE t.type IN
@@ -312,6 +320,8 @@ class FilmTracker:
 
     @log_class
     def set_counter_range(self):
+        """ Set the counter range based on the current values and the number
+        of title modules displayed """
         lower = self.range_display.lower
         num_titlemods = len(self.title_modules)
         self.range_display.mindiff = num_titlemods - 1
@@ -319,6 +329,8 @@ class FilmTracker:
 
     @log_class
     def set_title_text(self):
+        """ Set the text of the title modules based on the current displayed
+        range """
         if self.btn_toggle_rewatch.toggle_on:
             entries = self.ranked_entries_rewatches
         else:
@@ -333,11 +345,13 @@ class FilmTracker:
 
     @log_class
     def update_title_modules(self):
+        """ Update the text of all displayed title modules """
         self.set_counter_range()
         self.set_title_text()
 
     @log_class
     def add_new(self, *args, **kwargs):
+        """ Called from the add new button (+) """
         self.film_request = RequestFilmWindow(self.master)
         self.film_request.bind("<<SetValue>>", self.log_entry)
         self.film_request.start()
@@ -345,11 +359,51 @@ class FilmTracker:
     @log_class
     def log_entry(self, event):
         title_id = self.film_request.get_value()
+        # get the title object for this id
+        title = imdbf.get_title(title_id)
         self.film_request.destroy()
-        print(title_id) #TODO launch log entry window
+
+        # dim the window in the background for better contrast
+        self.dim(transparency = 0.7)
+
+        # open the window to log the entry
+        self.log_entry_window = LogEntryWindow(
+            self.master, bg = c.COLOUR_TRANSPARENT
+            )
+        self.log_entry_window.title_id = title.title_id
+        title_dict = title.get_dict("title")
+        title_dict_subset = {
+            key: title_dict[key] for key in
+            ["title", "original_title", "year", "director", "runtime"]
+            }
+        title_dict_subset["date"] = datetime.now().strftime("%Y-%m-%d")
+        self.log_entry_window.set_text(**title_dict_subset)
+        self.log_entry_window.bind("<<Destroy>>", lambda event: self.undim())
+        self.log_entry_window.bind("<<LogEntry>>", self.add_entry)
+        self.log_entry_window.start()
+
+    @log_class
+    def dim(self, transparency = 0.5):
+        self.master.wm_attributes("-alpha", transparency)
+
+    @log_class
+    def undim(self):
+        self.dim(transparency = 1)
+
+    @log_class
+    def add_entry(self, event):
+        entry_dict = self.log_entry_window.get_dict()
+        entry_dict["title_id"] = self.log_entry_window.title_id
+        self.log_entry_window.destroy()
+        self.undim()
+        imdbf.add_entry(**entry_dict)
+        self.query_data()
+        self.set_counter_range()
+        self.set_title_text()
 
     @log_class
     def toggle_rewatch(self, *args, **kwargs):
+        """ Toggle whether to include rewatches in the diary/counter or not """
         if self.btn_toggle_rewatch.toggle_on:
             self.range_display.set_maximum(max(self.ranked_entries_rewatches))
             self.counter.set_counter(self.count_entries)
@@ -360,6 +414,7 @@ class FilmTracker:
 
     @log_class
     def toggle_time(self, *args, **kwargs):
+        """ Toggle the icon displayed on the counter """
         if self.btn_toggle_time.toggle_on:
             self.counter.set_icon(type = "time")
         else:
@@ -367,25 +422,32 @@ class FilmTracker:
 
     @log_class
     def count_title_modules(self):
+        """ Get the number of title modules currently displayed """
         return len(self.title_modules)
 
     @log_class
     def deincrement(self, *args, **kwargs):
+        """ Increment the range display so that the previous set of titles is
+        displayed """
         self.range_display.increment(-1*self.count_title_modules())
         self.update_title_modules()
 
     @log_class
     def increment(self, *args, **kwargs):
+        """ Increment the range display so that the next set of titles is
+        displayed """
         self.range_display.increment(self.count_title_modules())
         self.update_title_modules()
 
     @log_class
     def deincrement_all(self, *args, **kwargs):
+        """ Deincrement the range display as far as possible """
         self.range_display.increment(-1*self.range_display.lower + 1)
         self.update_title_modules()
 
     @log_class
     def increment_all(self, *args, **kwargs):
+        """ Increment the range display as far as possible """
         if self.btn_toggle_rewatch.toggle_on:
             self.range_display.increment(self.count_entries)
         else:
@@ -482,6 +544,8 @@ class FilmTracker:
 
 if __name__ == "__main__":
     root = tk.Tk()
+    style = ttk.Style()
+    style.configure('entrytag.TMenubutton', font = ("Helvetica", 16))
     root.configure(bg = c.COLOUR_FILM_BACKGROUND, pady = 30)
     # root.overrideredirect(True)
     root.columnconfigure(0, weight = 1)
