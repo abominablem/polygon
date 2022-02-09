@@ -283,8 +283,11 @@ class TitleModuleEditable(TitleModule):
     @log_class
     def get_values(self):
         val_dict = self.get_dict()
-        return_dict = {key: val_dict[key] for key in ["date", "rating"]}
-        return_dict["entry_tags"] = self.tags
+        return_dict = {
+            "entry_date": val_dict["date"],
+            "rating": val_dict["rating"],
+            "tags": self.tags
+            }
         return return_dict
 
     @log_class
@@ -530,6 +533,7 @@ class LogEntryWindow(tk.Toplevel):
         self.tick_label.bind("<Leave>", self._leave_tick)
         self.tick_label.bind("<1>", self._click_tick)
 
+    @log_class
     def start(self):
         self.overrideredirect(True)
         self.attributes('-topmost', True)
@@ -537,6 +541,10 @@ class LogEntryWindow(tk.Toplevel):
         self.lift()
         self.master.eval(f'tk::PlaceWindow {self} center')
         self.mainloop()
+
+    @log_class
+    def get_dict(self):
+        return self.data.get_values()
 
     @log_class
     def _enter_x(self, *args):
@@ -548,6 +556,7 @@ class LogEntryWindow(tk.Toplevel):
 
     @log_class
     def _click_x(self, *args):
+        self.event_generate("<<Destroy>>")
         self.destroy()
 
     @log_class
