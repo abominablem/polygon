@@ -520,6 +520,9 @@ class IMDbFunctions:
         return [self._search_object_to_dict(movie)
                 for movie in results_filtered]
 
+    def get_title(self, title_id, refresh = False):
+        return self.titles.get(title_id, refresh)
+
 
 class IMDbBaseTitleFunctions:
     """ Base class for function classes editing the titles table """
@@ -770,5 +773,6 @@ class IMDbEntryFunctions:
 
 
 imdbf = IMDbFunctions()
-# # imdbf.add_entry(title_id = 'tt13984924', entry_date = '2022-01-31', rating = 7, rewatch = False, tags  = {'platform': 'Download'})
+# imdbf.add_entry(title_id = 'tt11271038', entry_date = '2022-02-05', rating = 8, rewatch = False, tags  = {'platform': 'Cinema', 'location': "Ritzy Brixton", 'people': "Abel Bede"})
+# imdbf.add_entry(title_id = 'tt5026476', entry_date = '2022-02-08', rating = 8, rewatch = False, tags  = {'platform': 'Download'})
 # base.polygon_db.close()
