@@ -249,16 +249,29 @@ class TitleModuleEditable(TitleModule):
         self.date.config(cursor = "hand2")
         self.date.bind("<1>", self._click_date)
 
-        with Image.open(r".\common\tag_outlined_thin.png") as image:
-            self.tag_icon_image = ImageTk.PhotoImage(image.resize((100, 100)))
-        self.tag_icon = tk.Label(self.master, image = self.tag_icon_image,
-                                cursor = "hand2", bg = c.COLOUR_TRANSPARENT)
-        self.tag_icon.bind("<1>", self._click_tag_icon)
-        self.tag_icon.grid(row = 0, column = 1, **c.GRID_STICKY, padx = 20)
+        with Image.open(r".\common\tag_outlined.png") as image:
+            self.tag_icon_image = {
+                "standard": ImageTk.PhotoImage(image.resize((100, 100)))
+                }
+        with Image.open(r".\common\tag_outlined_hover.png") as image:
+            self.tag_icon_image.update({
+                "hover": ImageTk.PhotoImage(image.resize((100, 100)))
+                })
 
+        self.tag_icon = tk.Label(
+            self.master, image = self.tag_icon_image["standard"],
+            cursor = "hand2", bg = c.COLOUR_TRANSPARENT
+            )
+        self.tag_icon.bind("<Enter>", self._enter_tag_icon)
+        self.tag_icon.bind("<Leave>", self._leave_tag_icon)
+        self.tag_icon.bind("<1>", self._click_tag_icon)
+        self.tag_icon.grid(row = 0, column = 2, **c.GRID_STICKY, padx = 20)
+
+        # frame for the tag images
         self.tag_frame = tk.Frame(self.master, bg = c.COLOUR_TRANSPARENT)
         self.tag_frame.grid(row = 1, column = 0, columnspan = c.COLUMNSPAN_ALL,
                             **c.GRID_STICKY, padx = 10, pady = 10)
+
         self._tag_images = {}
         self._tag_widgets = {}
         self.tags = {}
@@ -308,10 +321,18 @@ class TitleModuleEditable(TitleModule):
         self.ask_tag()
 
     @log_class
+    def _enter_tag_icon(self, *args):
+        self.tag_icon.config(image = self.tag_icon_image["hover"])
+
+    @log_class
+    def _leave_tag_icon(self, *args):
+        self.tag_icon.config(image = self.tag_icon_image["standard"])
+
+    @log_class
     def ask_tag(self, *args):
         """ Open an interface to select the tag name and value """
-        self.tag_window = TagSelection(self.master,
-                                       bg = c.COLOUR_FILM_BACKGROUND)
+        self.tag_window = TagSelection(
+            self.master, bg = c.COLOUR_FILM_BACKGROUND)
         self.tag_window.lift()
         self.tag_window.bind("<Return>", self.get_tag)
         self.tag_window.bind("<<TickClick>>", self.get_tag)
@@ -470,13 +491,44 @@ class LogEntryWindow(tk.Toplevel):
 
         self.wm_attributes("-transparentcolor", c.COLOUR_TRANSPARENT)
 
-        self.data = TitleModuleEditable(self)
-        self.data.grid(row = 0, column = 0, **c.GRID_STICKY)
+        self.data_frame = tk.Frame(self, bg = c.COLOUR_TRANSPARENT)
+        self.data = TitleModuleEditable(self.data_frame)
+        self.data.grid(row = 0, column = 1, **c.GRID_STICKY)
+        self.data_frame.grid(row = 0, column = 1, **c.GRID_STICKY)
 
-        def ret(*args):
-            print(self.data.get_values())
+        self.x_image = {
+            "standard": ImageTk.PhotoImage(
+                tagf.x_image(height = 100, colour = "black")
+                ),
+            "hover": ImageTk.PhotoImage(
+                tagf.x_image(height = 100, colour = "gray")
+                )
+            }
+        self.x_label = tk.Label(
+            self, bg = c.COLOUR_TRANSPARENT, image = self.x_image["standard"],
+            anchor = "n", cursor = "hand2"
+            )
+        self.x_label.grid(row = 0, column = 0, **c.GRID_STICKY)
+        self.x_label.bind("<Enter>", self._enter_x)
+        self.x_label.bind("<Leave>", self._leave_x)
+        self.x_label.bind("<1>", self._click_x)
 
-        self.bind("<Return>", ret)
+        self.tick_image = {
+            "standard": ImageTk.PhotoImage(
+                tagf.tick_image(height = 100, colour = "black")
+                ),
+            "hover": ImageTk.PhotoImage(
+                tagf.tick_image(height = 100, colour = "gray")
+                )
+            }
+        self.tick_label = tk.Label(
+            self, bg = c.COLOUR_TRANSPARENT, image = self.tick_image["standard"],
+            anchor = "n", cursor = "hand2"
+            )
+        self.tick_label.grid(row = 0, column = 2, **c.GRID_STICKY)
+        self.tick_label.bind("<Enter>", self._enter_tick)
+        self.tick_label.bind("<Leave>", self._leave_tick)
+        self.tick_label.bind("<1>", self._click_tick)
 
     def start(self):
         self.overrideredirect(True)
@@ -485,6 +537,34 @@ class LogEntryWindow(tk.Toplevel):
         self.lift()
         self.master.eval(f'tk::PlaceWindow {self} center')
         self.mainloop()
+
+    @log_class
+    def _enter_x(self, *args):
+        self.x_label.config(image = self.x_image["hover"])
+
+    @log_class
+    def _leave_x(self, *args):
+        self.x_label.config(image = self.x_image["standard"])
+
+    @log_class
+    def _click_x(self, *args):
+        self.destroy()
+
+    @log_class
+    def _enter_tick(self, *args):
+        self.tick_label.config(image = self.tick_image["hover"])
+
+    @log_class
+    def _leave_tick(self, *args):
+        self.tick_label.config(image = self.tick_image["standard"])
+
+    @log_class
+    def _click_tick(self, *args):
+        self.event_generate("<<LogEntry>>")
+
+    @log_class
+    def set_text(self, **kwargs):
+        self.data.set_text(**kwargs)
 
 
 if __name__  == "__main__":
