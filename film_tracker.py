@@ -9,7 +9,6 @@ import sys
 sys.path.append("D:\\Users\\Marcus\\Documents\\R Documents\\Coding\\Python\\Packages")
 import tkinter as tk
 from tkinter import ttk
-from widgets import TitleModule, Counter, Padding, RangeDisplay, PolygonButton
 from datetime import datetime
 import re
 
@@ -19,10 +18,9 @@ import described_widgets as dw
 import constants as c
 import base
 from imdb_functions import imdbf
+from widgets import TitleModule, Counter, Padding, RangeDisplay, PolygonButton
 from log_entry import LogEntryWindow
 
-log_all = log_class("all")
-log_min = log_class("min")
 log_class = log_class(c.LOG_LEVEL)
 
 class RequestFilmWindow(tk.Toplevel):
@@ -34,7 +32,12 @@ class RequestFilmWindow(tk.Toplevel):
         super().__init__(master, *args, **kwargs)
         self.master.eval(f'tk::PlaceWindow {self} center')
 
-        self.primary_search_frame = tk.Frame(self, bg = c.COLOUR_FILM_BACKGROUND)
+        self.widget_frame = base.TrimmedFrame(self, bg = c.COLOUR_FILM_BACKGROUND)
+        self.widget_frame.grid(row = 0, column = 0, **c.GRID_STICKY)
+
+        self.primary_search_frame = tk.Frame(
+            self.widget_frame.inner, bg = c.COLOUR_FILM_BACKGROUND
+            )
         self.text = tk.Label(
             self.primary_search_frame, fg = c.COLOUR_OFFWHITE_TEXT,
             font = ("Helvetica", 24), bg = c.COLOUR_FILM_BACKGROUND,
@@ -51,12 +54,12 @@ class RequestFilmWindow(tk.Toplevel):
         self.search_text.grid(row = 0, column = 0, **c.GRID_STICKY)
 
         self.btn_close = tk.Button(
-            self.primary_search_frame, command = self.destroy, text = "Close",
-            font = ("Helvetica", 24, )
+            self.primary_search_frame, command = self.destroy,
+            text = "Close", font = ("Helvetica", 24, )
             )
         self.btn_search = tk.Button(
-            self.primary_search_frame, command = self.search, text = "Search",
-            font = ("Helvetica", 24, )
+            self.primary_search_frame, command = self.search,
+            text = "Search", font = ("Helvetica", 24, )
             )
 
         widgets = {1: {'widget': self.text,
@@ -78,7 +81,7 @@ class RequestFilmWindow(tk.Toplevel):
 
         # frame to hold the secondary search widgets to display search results
         self.secondary_search_frame = tk.Frame(
-            self, bg = c.COLOUR_FILM_BACKGROUND
+            self.widget_frame.inner, bg = c.COLOUR_FILM_BACKGROUND
             )
         self.search_results = dw.SimpleTreeview(
             self.secondary_search_frame,
@@ -94,7 +97,16 @@ class RequestFilmWindow(tk.Toplevel):
         self.secondary_search_frame.columnconfigure(0, weight = 1)
         self.secondary_search_frame.rowconfigure(0, weight = 1)
 
+        self.search_text.focus_force()
+
+        self.bind("<Escape>", lambda event: self.destroy())
+        self.bind("<Return>", self.search)
         self.protocol("WM_DELETE_WINDOW", self.destroy)
+
+    @log_class
+    def destroy(self, *args):
+        self.event_generate("<<Destroy>>")
+        super().destroy()
 
     @log_class
     def search(self, *args, **kwargs):
@@ -153,10 +165,11 @@ class RequestFilmWindow(tk.Toplevel):
 
     @log_class
     def start(self):
-        self.master.eval('tk::PlaceWindow %s center' % str(self))
-        self.lift()
+        self.master.eval(f'tk::PlaceWindow {self} center')
+        self.overrideredirect(True)
         self.transient(self.master)
         self.grab_set()
+        self.lift()
         self.mainloop()
 
     @log_class
@@ -354,6 +367,8 @@ class FilmTracker:
         """ Called from the add new button (+) """
         self.film_request = RequestFilmWindow(self.master)
         self.film_request.bind("<<SetValue>>", self.log_entry)
+        self.film_request.bind("<<Destroy>>", self.undim)
+        self.dim(transparency = 0.7)
         self.film_request.start()
 
     @log_class
@@ -378,7 +393,7 @@ class FilmTracker:
             }
         title_dict_subset["date"] = datetime.now().strftime("%Y-%m-%d")
         self.log_entry_window.set_text(**title_dict_subset)
-        self.log_entry_window.bind("<<Destroy>>", lambda event: self.undim())
+        self.log_entry_window.bind("<<Destroy>>", self.undim)
         self.log_entry_window.bind("<<LogEntry>>", self.add_entry)
         self.log_entry_window.start()
 
@@ -387,7 +402,7 @@ class FilmTracker:
         self.master.wm_attributes("-alpha", transparency)
 
     @log_class
-    def undim(self):
+    def undim(self, *args, **kwargs):
         self.dim(transparency = 1)
 
     @log_class
