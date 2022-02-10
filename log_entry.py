@@ -536,8 +536,8 @@ class LogEntryWindow(tk.Toplevel):
     @log_class
     def start(self):
         self.overrideredirect(True)
-        self.attributes('-topmost', True)
-        self.bind("<Escape>", lambda event: root.destroy())
+        self.transient(self.master)
+        self.bind("<Escape>", lambda event: self.destroy())
         self.lift()
         self.master.eval(f'tk::PlaceWindow {self} center')
         self.mainloop()
