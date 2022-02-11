@@ -94,17 +94,18 @@ class PolygonWindowBase:
 
 class TrimmedFrame(tk.Frame):
     @log_class
-    def __init__(self, master, *args, **kwargs):
+    def __init__(self, master, outer_colour = c.COLOUR_FILM_TRIM,
+                 inner_colour = "black", *args, **kwargs):
         super().__init__(master, *args, **kwargs)
 
         self.outer = tk.Frame(
             self, highlightthickness = 7,
-            highlightbackground = c.COLOUR_FILM_TRIM,
-            highlightcolor = c.COLOUR_FILM_TRIM
+            highlightbackground = outer_colour,
+            highlightcolor = outer_colour
             )
         self.inner = tk.Frame(
             self.outer, highlightthickness = 1,
-            highlightbackground = "black", highlightcolor = "black"
+            highlightbackground = inner_colour, highlightcolor = inner_colour
             )
         self.outer.grid(row = 0, column = 0, **c.GRID_STICKY)
         self.outer.columnconfigure(0, weight = 1)
