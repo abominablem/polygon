@@ -17,6 +17,7 @@ import tk_arrange as tka
 import described_widgets as dw
 import constants as c
 import base
+from futil import get_tk
 from imdb_functions import imdbf
 from widgets import TitleModule, Counter, Padding, RangeDisplay, PolygonButton
 from log_entry import LogEntryWindow
@@ -28,11 +29,14 @@ class RequestFilmWindow(tk.Toplevel):
     a film title """
     @log_class
     def __init__(self, master, *args, **kwargs):
-        self.master = master
+        self.window = get_tk(self)
         super().__init__(master, *args, **kwargs)
-        self.master.eval(f'tk::PlaceWindow {self} center')
+        self.window.eval(f'tk::PlaceWindow {self} center')
 
-        self.widget_frame = base.TrimmedFrame(self, bg = c.COLOUR_FILM_BACKGROUND)
+        self.widget_frame = base.TrimmedFrame(
+            self, bg = c.COLOUR_FILM_BACKGROUND,
+            inner_colour = c.COLOUR_INTERFACE_BUTTON
+            )
         self.widget_frame.grid(row = 0, column = 0, **c.GRID_STICKY)
 
         self.primary_search_frame = tk.Frame(
@@ -165,7 +169,7 @@ class RequestFilmWindow(tk.Toplevel):
 
     @log_class
     def start(self):
-        self.master.eval(f'tk::PlaceWindow {self} center')
+        self.window.eval(f'tk::PlaceWindow {self} center')
         self.overrideredirect(True)
         self.transient(self.master)
         self.grab_set()
@@ -182,15 +186,19 @@ class RequestFilmWindow(tk.Toplevel):
         """ Return user input """
         return self.user_input
 
-class FilmTracker:
+class FilmTracker(tk.Frame):
     @log_class
-    def __init__(self, master):
+    def __init__(self, master, window, *args, **kwargs):
+        self.window = window
         self._during_startup = True
         self.master = master
+        super().__init__(master, *args, **kwargs)
+        self.columnconfigure(0, weight = 1)
+        self.rowconfigure(1, weight = 1)
 
         """ Build header with buttons and summary """
         self.header_frame = tk.Frame(
-            self.master, bg = c.COLOUR_FILM_BACKGROUND
+            self, bg = c.COLOUR_FILM_BACKGROUND
             )
         self.counter = Counter(
             self.header_frame, bg = c.COLOUR_FILM_BACKGROUND,
@@ -272,7 +280,7 @@ class FilmTracker:
         self.header.grid(row = 0, column = 0, **c.GRID_STICKY,
                          pady = (10, 20))
         self.header_frame.grid(row = 0, column = 0, **c.GRID_STICKY,
-                               padx = (20, 0))
+                               padx = (20, 0), pady = (20, 0))
         self.header_frame.columnconfigure(0, weight = 1)
 
         """ Get data from database """
@@ -280,7 +288,7 @@ class FilmTracker:
 
         """ Create TitleModules """
         self.titlemod_frame = tk.Frame(
-            self.master, bg = c.COLOUR_FILM_BACKGROUND
+            self, bg = c.COLOUR_FILM_BACKGROUND
             )
         self.titlemod_frame.grid(row = 1, column = 0, **c.GRID_STICKY)
         self.titlemod_frame.columnconfigure(0, weight = 1)
@@ -295,7 +303,7 @@ class FilmTracker:
 
         # allow time for widgets to be placed and settle before formally
         # ending startup
-        self.master.after(1000, self.end_startup)
+        self.after(1000, self.end_startup)
 
     @log_class
     def end_startup(self, *args, **kwargs):
@@ -365,7 +373,7 @@ class FilmTracker:
     @log_class
     def add_new(self, *args, **kwargs):
         """ Called from the add new button (+) """
-        self.film_request = RequestFilmWindow(self.master)
+        self.film_request = RequestFilmWindow(self)
         self.film_request.bind("<<SetValue>>", self.log_entry)
         self.film_request.bind("<<Destroy>>", self.undim)
         self.dim(transparency = 0.7)
@@ -383,7 +391,7 @@ class FilmTracker:
 
         # open the window to log the entry
         self.log_entry_window = LogEntryWindow(
-            self.master, bg = c.COLOUR_TRANSPARENT
+            self, bg = c.COLOUR_TRANSPARENT
             )
         self.log_entry_window.title_id = title.title_id
         title_dict = title.get_dict("title")
@@ -399,7 +407,7 @@ class FilmTracker:
 
     @log_class
     def dim(self, transparency = 0.5):
-        self.master.wm_attributes("-alpha", transparency)
+        self.window.wm_attributes("-alpha", transparency)
 
     @log_class
     def undim(self, *args, **kwargs):
@@ -472,7 +480,7 @@ class FilmTracker:
     @log_class
     def get_available_height(self):
         """ Get space available for title modules to be added """
-        window_height = root.winfo_height()
+        window_height = self.winfo_height()
         header_height = self.header.master.winfo_height()
         return window_height - header_height
 
@@ -508,13 +516,13 @@ class FilmTracker:
 
     @log_class
     def _bind_configure(self, *args, **kwargs):
-        self._configure_binding = self.master.bind(
+        self._configure_binding = self.bind(
             "<Configure>", self._configure
             )
 
     @log_class
     def _unbind_configure(self, *args, **kwargs):
-        self.master.unbind("<Configure>", self._configure_binding)
+        self.unbind("<Configure>", self._configure_binding)
 
     @log_class
     def create_titlemods(self):
@@ -543,7 +551,8 @@ class FilmTracker:
         """ Add a new title module to the end """
         i = self.count_title_modules()
         tm = TitleModule(
-            self.titlemod_frame, bg = "black", padx = 10, pady = 20
+            self.titlemod_frame, bg = c.COLOUR_FILM_BACKGROUND, padx = 10,
+            pady = 20
             )
         self.title_modules[i] = tm
         tm.grid(row = i, column = 0, **c.GRID_STICKY)
