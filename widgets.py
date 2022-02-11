@@ -354,7 +354,7 @@ class TitleModule(tk.Frame):
                 if kwargs[kw]:
                     self.rewatch.config(fg = "white")
                 else:
-                    self.rewatch.config(fg = "black")
+                    self.rewatch.config(fg = c.COLOUR_FILM_BACKGROUND)
 
             elif kw == "number" and self.include_number:
                 self.__dict__[kw].config(text = kwargs[kw])
