@@ -17,8 +17,8 @@ from mh_logging import log_class
 import tk_arrange as tka
 import constants as c
 import base
-from imdb_functions import imdbf
 import log_entry_tag as tagf
+from futil import get_tk
 
 log_class = log_class(c.LOG_LEVEL)
 
@@ -539,7 +539,7 @@ class LogEntryWindow(tk.Toplevel):
         self.transient(self.master)
         self.bind("<Escape>", lambda event: self.destroy())
         self.lift()
-        self.master.eval(f'tk::PlaceWindow {self} center')
+        get_tk(self).eval(f'tk::PlaceWindow {self} center')
         self.mainloop()
 
     @log_class
