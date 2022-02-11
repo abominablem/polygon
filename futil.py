@@ -65,3 +65,6 @@ def format_time(time, unit = "seconds", round_to = "seconds"):
             time_string += "%s%s " % (duration, time_unit_short[time_unit])
 
     return time_string[:-1] # trim trailing space
+
+def get_tk(widget):
+    return widget.nametowidget(".")
