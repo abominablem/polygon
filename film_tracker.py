@@ -29,8 +29,8 @@ class RequestFilmWindow(tk.Toplevel):
     a film title """
     @log_class
     def __init__(self, master, *args, **kwargs):
-        self.window = get_tk(self)
         super().__init__(master, *args, **kwargs)
+        self.window = get_tk(self)
         self.window.eval(f'tk::PlaceWindow {self} center')
 
         self.widget_frame = base.TrimmedFrame(
