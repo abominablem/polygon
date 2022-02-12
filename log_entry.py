@@ -26,7 +26,6 @@ class TagSelection(tk.Toplevel):
     tag_name_new = " - New - "
     @log_class
     def __init__(self, master, *args, **kwargs):
-        self.master = master
         super().__init__(master, *args, **kwargs)
 
         self.widget_frame = base.TrimmedFrame(self)
@@ -351,11 +350,10 @@ class TitleModuleEditable(TitleModule):
     def get_tag(self, *args):
         """ Get the tag details from the open tag window, and then close it """
         tag_dict = self.tag_window.get_dict()
-        if tag_dict["value"] is None or tag_dict["value"] == "":
-            self.tag_window.destroy()
-            return
-        self.add_tag(**tag_dict)
+        if not (tag_dict["value"] is None or tag_dict["value"] == ""):
+            self.add_tag(**tag_dict)
         self.tag_window.destroy()
+        self.event_generate("<<SubwindowClose>>")
 
     @log_class
     def add_tag(self, name, value):
@@ -363,6 +361,8 @@ class TitleModuleEditable(TitleModule):
         window """
         self.add_tag_dict(name, value)
         self.add_tag_image(name, value)
+        # the tag window grabs the set away from this one, so grab it back when
+        # done
         self._increment_tag_count()
 
     @log_class
@@ -470,6 +470,7 @@ class TitleModuleEditable(TitleModule):
     @log_class
     def exit_calendar(self, *args):
         self.calendar.destroy()
+        self.event_generate("<<SubwindowClose>>")
         # since the calendar will overlap the tags, don't indicate that the
         # calendar is closed until shortly after it actually is. This prevents
         # accidentally removing tags from extra clicks
@@ -496,6 +497,7 @@ class LogEntryWindow(tk.Toplevel):
 
         self.data_frame = tk.Frame(self, bg = c.COLOUR_TRANSPARENT)
         self.data = TitleModuleEditable(self.data_frame)
+        self.data.bind("<<SubwindowClose>>", self.grab_focus)
         self.data.grid(row = 0, column = 1, **c.GRID_STICKY)
         self.data_frame.grid(row = 0, column = 1, **c.GRID_STICKY)
 
@@ -532,6 +534,12 @@ class LogEntryWindow(tk.Toplevel):
         self.tick_label.bind("<Enter>", self._enter_tick)
         self.tick_label.bind("<Leave>", self._leave_tick)
         self.tick_label.bind("<1>", self._click_tick)
+
+    @log_class
+    def grab_focus(self, *args, **kwargs):
+        self.focus_force()
+        self.lift()
+        self.grab_set()
 
     @log_class
     def start(self):
