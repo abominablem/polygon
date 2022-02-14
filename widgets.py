@@ -46,7 +46,6 @@ class RatingDisplay(tk.Text):
         super().__init__(master, **kwargs, height = 1, wrap = 'none',
                          state = 'disabled', relief = "flat")
 
-
         if not 'font' in kwargs:
             self.font = tkf.nametofont(self.configure('font')[-1])
         else:
@@ -308,7 +307,10 @@ class TitleModule(tk.Frame):
 
     @log_class
     def format_runtime(self, runtime):
-        return futil.format_time(int(runtime), "minutes")
+        try:
+            return futil.format_time(int(runtime), "minutes")
+        except ValueError:
+            return "N/A"
 
     @log_class
     def format_date(self, date):
@@ -373,10 +375,11 @@ class Counter(tk.Frame):
 
         self._pixel = tk.PhotoImage(width = 1, height = 1)
 
-        font_icon = ("Calibri", 40)
-        font_count = ("Calibri", 36)
+        self.font_count_size = 36
+        self.font_icon = ("Calibri", 40)
+        self.font_count = ("Calibri", self.font_count_size)
         self.icon = tk.Label(
-            self.counter_frame.inner, text = "#", font = font_icon,
+            self.counter_frame.inner, text = "#", font = self.font_icon,
             padx = 15, image = self._pixel, compound = "center", width = 40
             )
         self.icon.grid(row = 0, column = 0, **c.GRID_STICKY)
@@ -384,9 +387,12 @@ class Counter(tk.Frame):
         self.counter_frame.inner.rowconfigure(0, weight = 1)
 
         self.counter = tk.Label(
-            self.counter_frame.inner, text = "0", font = font_count,
+            self.counter_frame.inner, text = "0", font = self.font_count,
             padx = 25, image = self._pixel, compound = "center", width = 130
             )
+
+        self.font = tkf.Font(self.counter, self.font_count)
+
         self.counter.grid(row = 0, column = 1, **c.GRID_STICKY)
         self.counter_frame.inner.columnconfigure(1, weight = 1)
 
@@ -395,6 +401,7 @@ class Counter(tk.Frame):
     @log_class
     def set_counter(self, count):
         self.counter.config(text = count)
+        self.fit_text()
 
     @log_class
     def set_icon(self, type):
@@ -404,6 +411,29 @@ class Counter(tk.Frame):
             self.icon.config(text = "")
         else:
             raise ValueError
+
+    @log_class
+    def fit_text(self, *args, **kwargs):
+        text = self.counter.cget('text')
+        self.counter.config(font = self.get_font(text))
+
+    @log_class
+    def get_font(self, text):
+        """ Get the font needed to fit the given text into the widget """
+        width = self.font.measure(text)
+        widget_width = self.counter.winfo_width()
+
+        # width is <=1 during startup
+        if widget_width <= 1: return self.font_count
+
+        font = self.font_count
+        font_size = self.font_count_size
+        while width > widget_width:
+            font = ("Calibri", font_size)
+            font_obj = tkf.Font(self.counter, font)
+            width = font_obj.measure(text)
+            font_size -= 1
+        return font
 
 class RangeDisplay(tk.Frame):
     @log_class
@@ -512,8 +542,6 @@ class Padding(tk.Label):
         kwargs["bg"] = c.COLOUR_FILM_BACKGROUND
         kwargs["text"] = ""
         super().__init__(master, *args, **kwargs)
-
-
 
 
 # test = "RatingDisplay"
