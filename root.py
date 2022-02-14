@@ -22,7 +22,6 @@ class Polygon(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Polygon")
-        self.window = self
         self.iconphoto(True, tk.PhotoImage(file = c.LOGO_PATH))
         self.protocol("WM_DELETE_WINDOW", self.destroy)
         self.columnconfigure(0, weight = 1)
@@ -34,7 +33,7 @@ class Polygon(tk.Tk):
         self.divider = tk.Frame(self.widget_frame, bg = "white", height = 1)
 
         self.film_tracker = FilmTracker(
-            self.widget_frame, window = self, bg = c.COLOUR_FILM_BACKGROUND
+            self.widget_frame, bg = c.COLOUR_FILM_BACKGROUND
             )
 
         widgets = {1: {'widget': self.header,
