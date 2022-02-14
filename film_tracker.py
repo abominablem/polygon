@@ -17,7 +17,7 @@ import tk_arrange as tka
 import described_widgets as dw
 import constants as c
 import base
-from futil import get_tk
+from futil import get_tk, format_time
 from imdb_functions import imdbf
 from widgets import TitleModule, Counter, Padding, RangeDisplay, PolygonButton
 from log_entry import LogEntryWindow
@@ -28,7 +28,8 @@ class RequestFilmWindow(tk.Toplevel):
     """ Window to get user film input, either as an IMDb ID or by searching for
     a film title """
     @log_class
-    def __init__(self, master, *args, **kwargs):
+    def __init__(self, master, type = "movie", *args, **kwargs):
+        self.type = type
         super().__init__(master, *args, **kwargs)
         self.window = get_tk(self)
         self.window.eval(f'tk::PlaceWindow {self} center')
@@ -119,7 +120,7 @@ class RequestFilmWindow(tk.Toplevel):
         if self.is_imdb_id(search_text):
             self.set_value(search_text)
         else:
-            search_results = imdbf.search_title(search_text, type = "movie")
+            search_results = imdbf.search_title(search_text, type = self.type)
             self.load_search_results(search_results)
             self.add_secondary_search_widgets()
 
@@ -188,11 +189,10 @@ class RequestFilmWindow(tk.Toplevel):
 
 class FilmTracker(tk.Frame):
     @log_class
-    def __init__(self, master, window, *args, **kwargs):
-        self.window = window
+    def __init__(self, master, *args, **kwargs):
         self._during_startup = True
-        self.master = master
         super().__init__(master, *args, **kwargs)
+        self.window = get_tk(self)
         self.columnconfigure(0, weight = 1)
         self.rowconfigure(1, weight = 1)
 
@@ -309,11 +309,24 @@ class FilmTracker(tk.Frame):
     def end_startup(self, *args, **kwargs):
         self._during_startup = False
 
+    @log_class
     def query_data(self):
         self.get_ranked_entries()
         self.get_film_counts()
         self.range_display.set_maximum(max(self.ranked_entries))
         self.counter.set_counter(self.count_films)
+
+    @log_class
+    def set_counter(self):
+        if self.btn_toggle_time.toggle_on:
+            self.counter.set_counter(
+                format_time(self.total_runtime, unit = 'minutes',
+                round_to = 'minutes')
+                )
+        elif self.btn_toggle_rewatch.toggle_on:
+            self.counter.set_counter(self.count_entries)
+        else:
+            self.counter.set_counter(self.count_films)
 
     @log_class
     def get_ranked_entries(self):
@@ -338,6 +351,10 @@ class FilmTracker(tk.Frame):
             titles t ON e.title_id = t.title_id WHERE t.type IN
             ('%s') AND e.entry_date IS NOT NULL"""
             % "', '".join(c.MOVIE_TYPES))[0][0]
+        self.total_runtime = int(imdbf.db.entries.select(
+            """ SELECT SUM(t.runtime) FROM entries e LEFT JOIN titles t
+            ON e.title_id = t.title_id WHERE t.type IN ('%s') """
+            % "', '".join(c.MOVIE_TYPES))[0][0])
 
     @log_class
     def set_counter_range(self):
@@ -429,10 +446,9 @@ class FilmTracker(tk.Frame):
         """ Toggle whether to include rewatches in the diary/counter or not """
         if self.btn_toggle_rewatch.toggle_on:
             self.range_display.set_maximum(max(self.ranked_entries_rewatches))
-            self.counter.set_counter(self.count_entries)
         else:
             self.range_display.set_maximum(max(self.ranked_entries))
-            self.counter.set_counter(self.count_films)
+        self.set_counter()
         self.update_title_modules()
 
     @log_class
@@ -442,6 +458,7 @@ class FilmTracker(tk.Frame):
             self.counter.set_icon(type = "time")
         else:
             self.counter.set_icon(type = "count")
+        self.set_counter()
 
     @log_class
     def count_title_modules(self):
@@ -573,5 +590,6 @@ if __name__ == "__main__":
     root.configure(bg = c.COLOUR_FILM_BACKGROUND, pady = 30)
     # root.overrideredirect(True)
     root.columnconfigure(0, weight = 1)
-    ft = FilmTracker(root)
+    ft = FilmTracker(root, bg = c.COLOUR_BACKGROUND)
+    ft.grid(row = 0, column = 0, **c.GRID_STICKY)
     root.mainloop()
