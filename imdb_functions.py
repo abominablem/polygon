@@ -67,7 +67,7 @@ class Title:
 
         self.type = self._data["kind"]
 
-        if self.type == "episode":
+        if self.type in c.EPISODE_TYPES:
             self.series_id = standardise_id(self._data["episode of"].getID())
             self.episode = self._data["episode"]
             self.season = self._data["season"]
@@ -270,23 +270,43 @@ class Title:
 
     @log_class
     def __str__(self):
-        if self.type == "episode":
-            date = "??" if self.release_date is None else self.release_date
-            return "%s : %s : %s S%02dE%02d %s (%s)" % (
-                self.title_id, self.type,
-                self._data["episode of"].get("title"), self.season,
-                self.episode, self.title, date
-                )
-        elif self.type == "series":
-            return "%s : %s : %s (%s)" % (
-                self.title_id, self.type, self.title,
-                self._data_get("series years", "??")
-                )
-        else:
-            year = "??" if self.year is None else self.year
-            return "%s : %s : %s (%s)" % (
-                self.title_id, self.type, self.title, year
-                )
+        try:
+            if self.type == "episode":
+                date = "??" if self.release_date is None else self.release_date
+                return "<%s : %s : %s S%02dE%02d %s (%s)>" % (
+                    self.title_id, self.type,
+                    self._data["episode of"].get("title"), self.season,
+                    self.episode, self.title, date
+                    )
+            elif self.type == "series":
+                return "<%s : %s : %s (%s)>" % (
+                    self.title_id, self.type, self.title,
+                    self._data_get("series years", "??")
+                    )
+            else:
+                year = "??" if self.year is None else self.year
+                return "<%s : %s : %s (%s)>" % (
+                    self.title_id, self.type, self.title, year
+                    )
+        except AttributeError:
+            if self.type == "episode":
+                date = "??" if self.release_date is None else self.release_date
+                return "<%s : %s : %s S%sE%s %s (%s)>" % (
+                    self.title_id, self.type, "<unknown>", "??",
+                    "??", self.title, date
+                    )
+            elif self.type == "series":
+                return "<%s : %s : %s (%s)>" % (
+                    self.title_id, self.type, self.title,
+                    self._data_get("series years", "??")
+                    )
+            else:
+                year = "??" if self.year is None else self.year
+                return "<%s : %s : %s (%s)>" % (
+                    self.title_id, self.type, self.title, year
+                    )
+
+    __repr__ = __str__
 
 class TitleExistsError(base.PolygonException):
     """ Raised when title already exists in database """
@@ -346,6 +366,8 @@ class IMDbFunctions:
 
     @log_class
     def exists(self, title):
+        """ Test if a given title exists in the database. Supports Title
+        object, title_id string, or dictionary containing title_id """
         if isinstance(title, Title):
             title_id = title.title_id
         elif isinstance(title, str):
@@ -375,7 +397,7 @@ class IMDbFunctions:
         try:
             if title.type in c.TV_TYPES:
                 self._add_series(title)
-            elif title.type == "episode":
+            elif title.type in c.EPISODE_TYPES:
                 self._add_episode(title)
             else:
                 self._add_title(title)
@@ -427,6 +449,7 @@ class IMDbFunctions:
         entry_id = max(self.entries.get_entry_id(title_id = title_id, **filters))
         self.entry_tags.add_dict(entry_id, tags)
 
+    @log_class
     def get_entry_by_rank(self, rank = None, type = None, rewatch = None):
         """ Return a dictionary of values for use in a TitleModule widget
         based on the provided single or iterable of entry ranks """
@@ -492,6 +515,7 @@ class IMDbFunctions:
             results_dict_all[rank] = result_dict
         return results_dict_all
 
+    @log_class
     def _search_object_to_dict(self, search_obj):
         obj_dict = {
             key: search_obj.data.get(key, "") for key in
@@ -502,6 +526,7 @@ class IMDbFunctions:
         obj_dict["type"] = obj_dict["kind"]
         return obj_dict
 
+    @log_class
     def search_title(self, search_text, type = None):
         """ Return search results for some search_text. Optionally filter by
         title type """
@@ -520,8 +545,31 @@ class IMDbFunctions:
         return [self._search_object_to_dict(movie)
                 for movie in results_filtered]
 
+    @log_class
     def get_title(self, title_id, refresh = False):
         return self.titles.get(title_id, refresh)
+
+    @log_class
+    def get_series(self, title_id, get_episodes = True, refresh = False):
+        series = self.get_title(title_id, refresh)
+        if get_episodes:
+            series.episodes = self.get_episodes(title_id, refresh)
+        seasons = {episode.season for episode in series.episodes}
+        series.seasons = {season: [] for season in seasons}
+        for episode in series.episodes:
+            series.seasons[episode.season].append(episode)
+        return series
+
+    @log_class
+    def get_episodes(self, title_id, refresh = False):
+        episode_dict = self.episodes.get_ids(title_id)
+        titles = []
+        for episode in episode_dict:
+            title = self.get_title(episode["title_id"], refresh)
+            title.__dict__.update(episode)
+            titles.append(title)
+        return titles
+
 
 
 class IMDbBaseTitleFunctions:
@@ -580,7 +628,7 @@ class IMDbEpisodesFunctions(IMDbBaseTitleFunctions):
         """ Add an episode or series of episodes to the database """
         if title.type in c.TV_TYPES:
             self._add_series_episodes(title)
-        elif title.type == "episode":
+        elif title.type in c.EPISODE_TYPES:
             if self.exists(title):
                 return
             self._add_episode(title)
@@ -603,6 +651,16 @@ class IMDbEpisodesFunctions(IMDbBaseTitleFunctions):
             for episode in series[season]:
                 title = Title(series[season][episode].title_id)
                 self.add(title)
+
+    @log_class
+    def get_ids(self, series_id):
+        """ Get all episode ids along with seasons and episode numbers for a
+        given series """
+        detail = self.episodes_db.filter(
+            filters = {"series_id": series_id}, return_cols = "*",
+            rc = "rowdict"
+            )
+        return detail
 
 class IMDbSeriesFunctions(IMDbBaseTitleFunctions):
     """ Container for functions relating to the series table """
@@ -768,11 +826,13 @@ class IMDbEntryFunctions:
 
     @log_class
     def get_entry_id(self, **kwargs):
+        """ Get all columns for a given entry_id """
         result = self.db.filter(kwargs, "entry_id")
         return result["entry_id"]
 
 
 imdbf = IMDbFunctions()
 # imdbf.add_entry(title_id = 'tt11271038', entry_date = '2022-02-05', rating = 8, rewatch = False, tags  = {'platform': 'Cinema', 'location': "Ritzy Brixton", 'people': "Abel Bede"})
-# imdbf.add_entry(title_id = 'tt5026476', entry_date = '2022-02-08', rating = 8, rewatch = False, tags  = {'platform': 'Download'})
+# imdbf.add_entry(title_id = 'tt1392190', entry_date = None, rating = 10, rewatch = True, tags  = {'platform': 'Download'})
+
 # base.polygon_db.close()
