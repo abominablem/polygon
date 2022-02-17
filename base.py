@@ -98,6 +98,9 @@ class TrimmedFrame(tk.Frame):
                  inner_colour = "black", *args, **kwargs):
         super().__init__(master, *args, **kwargs)
 
+        self.inner_colour = inner_colour
+        self.outer_colour = outer_colour
+
         self.outer = tk.Frame(
             self, highlightthickness = 7,
             highlightbackground = outer_colour,
