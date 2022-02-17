@@ -126,11 +126,13 @@ class RequestFilmWindow(tk.Toplevel):
 
     @log_class
     def add_secondary_search_widgets(self):
+        """ Display the search results widgets """
         self.secondary_search_frame.grid(row = 1, column = 0, **c.GRID_STICKY)
 
     @log_class
     def _search_results_values(self, res_dict):
-        " Episode/Series number "
+        """ Get the value lists needed for the result treeview from the search
+        results dict """
         episode = ("E%02d" % int(res_dict["episode"])
                    if res_dict["episode"] != "" else "")
         season = ("S%02d" % int(res_dict["season"])
@@ -143,6 +145,7 @@ class RequestFilmWindow(tk.Toplevel):
 
     @log_class
     def load_search_results(self, results):
+        """ Load a dictionary of search results into the results treeview """
         self.search_results.clear()
         for i, result_dict in enumerate(results):
             self.search_results.insert(
@@ -152,6 +155,7 @@ class RequestFilmWindow(tk.Toplevel):
 
     @log_class
     def select_search_result(self, *args, **kwargs):
+        """ Called when a search result is chosen """
         title_id = self.search_results.events["<Double-1>"]["row"]
         self.set_value(title_id)
 
