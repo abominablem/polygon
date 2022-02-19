@@ -550,6 +550,13 @@ class IMDbFunctions:
         return self.titles.get(title_id, refresh)
 
     @log_class
+    def get_series_with_entries(self, title_id):
+        series = self.get_series(title_id, get_episodes = True, refresh = False)
+        for episode in series.episodes:
+            episode.entry = Entry(episode.title_id)
+        return series
+
+    @log_class
     def get_series(self, title_id, get_episodes = True, refresh = False):
         series = self.get_title(title_id, refresh)
         if get_episodes:
@@ -570,6 +577,9 @@ class IMDbFunctions:
             titles.append(title)
         return titles
 
+    @log_class
+    def get_entry(self, title_id):
+        return Entry(title_id)
 
 
 class IMDbBaseTitleFunctions:
@@ -830,9 +840,32 @@ class IMDbEntryFunctions:
         result = self.db.filter(kwargs, "entry_id")
         return result["entry_id"]
 
+class Entry:
+    def __init__(self, title_id):
+        self.entries = base.polygon_db.entries.filter(
+            filters = {"title_id": title_id}, return_cols = "*",
+            rc = "rowdict"
+            )
+        for entry in self.entries:
+            if entry["rewatch"] == 'False':
+                self.first = entry
+                break
+        self.id = self.first["entry_id"]
+        self.date = self.first["entry_date"]
+        self.order = self.first["entry_order"]
+        self.rating = self.first["rating"]
+        self.rewatch = self.first["rewatch"] == 'True'
+        self.title_id = title_id
+
+    def __int__(self):
+        return self.id
+
+    def __str__(self):
+        return "<#%s %s %s~%s>" % (self.id, self.title_id, self.date, self.order)
+
+    __repr__ = __str__
+
 
 imdbf = IMDbFunctions()
-# imdbf.add_entry(title_id = 'tt11271038', entry_date = '2022-02-05', rating = 8, rewatch = False, tags  = {'platform': 'Cinema', 'location': "Ritzy Brixton", 'people': "Abel Bede"})
 # imdbf.add_entry(title_id = 'tt1392190', entry_date = None, rating = 10, rewatch = True, tags  = {'platform': 'Download'})
-
 # base.polygon_db.close()
