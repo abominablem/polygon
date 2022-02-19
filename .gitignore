@@ -122,3 +122,4 @@ testing.py
 *.xcf
 *.png
 *.db
+archive/tv_classes.py
