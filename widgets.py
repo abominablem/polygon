@@ -544,8 +544,62 @@ class Padding(tk.Label):
         super().__init__(master, *args, **kwargs)
 
 
+class FlexLabel(tk.Label):
+    """ Label with text that fits to the size of the widget """
+    @log_class
+    def __init__(self, master, *args, **kwargs):
+        super().__init__(master, *args, **kwargs)
+        # get the font used in the widget as a base
+        try:
+            _font_argument = kwargs['font']
+        except KeyError:
+            _font_argument = tkf.nametofont(self.cget('font'))
+
+        # convert to a tk.font.Font object
+        self._default_font = self._get_font_object(_font_argument)
+        self._default_font_size = self._default_font.cget('size')
+
+        self.bind("<Configure>", self._fit_text)
+
+    @log_class
+    def _get_font_object(self, font_arg):
+        if isinstance(font_arg, tkf.Font):
+            return font_arg
+        elif isinstance(font_arg, tuple):
+            return tkf.Font(self, font_arg)
+        else:
+            raise ValueError("Unknown font definition used")
+
+    @log_class
+    def _fit_text(self, *args, **kwargs):
+        text = self.cget('text')
+        self.config(font = self._get_font(text))
+
+    @log_class
+    def _get_font(self, text):
+        """ Get the font needed to fit the given text into the widget """
+        width = self._default_font.measure(text)
+        w_width, w_height = self.winfo_width(), self.winfo_height()
+
+        # width is <=1 during startup
+        if w_width <= 1: return self.font_count
+
+        font = self._default_font.copy()
+        font_size = self._default_font_size
+        # decrease font size until it fits both width and height
+        while width > w_width or font.metrics()['linespace'] > w_height:
+            font.config(size = font_size)
+            # size 1 is the smallest possible font, so use as default in the
+            # case that no size font will fit in the available space
+            if font_size == 1: return font
+            width = font.measure(text)
+            font_size -= 1
+        return font
+
+
 # test = "RatingDisplay"
-test = "TitleModule"
+# test = "TitleModule"
+test = "FlexLabel"
 
 if __name__ == "__main__":
     root = tk.Tk()
@@ -603,6 +657,12 @@ if __name__ == "__main__":
         title.grid(row = 1, column = 0, sticky = "nesw")
         root.rowconfigure(0, weight = 1)
         root.rowconfigure(1, weight = 1)
+        root.columnconfigure(0, weight = 1)
+
+    elif test == "FlexLabel":
+        title = FlexLabel(root, text = "this is some test text", font = ("Arial", 45, "bold"))
+        title.grid(row = 0, column = 0, sticky = "nesw")
+        root.rowconfigure(0, weight = 1)
         root.columnconfigure(0, weight = 1)
 
     root.mainloop()
