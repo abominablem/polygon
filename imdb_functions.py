@@ -441,6 +441,10 @@ class IMDbFunctions:
             self.add_title(title_id)
         except TitleExistsError:
             pass
+        # if previous entry already exists for the title, set rewatch to True
+        # unless explicitly specified
+        if self.entries.exists(title_id = title_id):
+            kwargs.setdefault("rewatch", True)
         self.entries.add(title_id, **kwargs)
         # get the auto-generated id of the entry that was just added
         filters = kwargs
@@ -840,16 +844,26 @@ class IMDbEntryFunctions:
         result = self.db.filter(kwargs, "entry_id")
         return result["entry_id"]
 
+    @log_class
+    def exists(self, **kwargs):
+        """ Test if entry exists for a given set of arguments """
+        result = self.db.filter(kwargs, "title_id")
+        return len(result["title_id"]) != 0
+
 class Entry:
     def __init__(self, title_id):
         self.entries = base.polygon_db.entries.filter(
             filters = {"title_id": title_id}, return_cols = "*",
             rc = "rowdict"
             )
+        self.watched = (len(self.entries) > 0)
+        self.first = {"entry_id": None, "entry_date": None,
+                      "entry_order": None, "rating": None, "rewatch": None}
         for entry in self.entries:
             if entry["rewatch"] == 'False':
                 self.first = entry
                 break
+
         self.id = self.first["entry_id"]
         self.date = self.first["entry_date"]
         self.order = self.first["entry_order"]
