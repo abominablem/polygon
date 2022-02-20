@@ -114,20 +114,6 @@ class EpisodeTable(base.TrimmedFrame):
     @log_class
     def __init__(self, master, **kwargs):
         super().__init__(master, **kwargs)
-        self.style = ttk.Style()
-        self.style.configure(
-            "EpisodeTable.Treeview", fieldbackground="white",
-            font=('Calibri', 20), rowheight=40, borderwidth = 10,
-            relief = 'flat'
-            )
-        self.style.map(
-            'EpisodeTable.Treeview', background=[('selected', '#F5F5F5')],
-            foreground=[('selected', 'black')]
-            )
-        self.style.configure(
-            "EpisodeTable.Treeview.Heading", font = ('Calibri', 20,'bold'),
-            padding = 5, rowheight = 60
-            )
 
         columns = {
             1: {"header": "#", "width": 70,
@@ -144,7 +130,9 @@ class EpisodeTable(base.TrimmedFrame):
                 "stretch": False, "anchor": "center"},
             }
         self.table = dw.SimpleTreeview(
-            self.inner, columns, style = "EpisodeTable.Treeview")
+            self.inner, columns, style = "EpisodeTable.Treeview", edit = True,
+            edit_focus_lost_confirm = True, edit_font = ('Calibri', 20)
+            )
         self.table.grid(row = 0, column = 0, **c.GRID_STICKY)
 
         self.rowconfigure(0, weight = 1)
@@ -253,7 +241,8 @@ class TvTracker(tk.Frame):
         widgets = {
             1: {'widget': self.episode_table,
                 'grid_kwargs': {**c.GRID_STICKY, "padx": (30, 30)},
-                'stretch_width': True, 'stretch_width_weight': 5},
+                'stretch_width': True, 'stretch_width_weight': 5,
+                'stretch_height': True},
             # 2: {'widget': self.btn_add_new,
             #     'grid_kwargs': {**c.GRID_STICKY, "pady": 10}},
             # 3: {'widget': self.season_display,
@@ -269,7 +258,6 @@ class TvTracker(tk.Frame):
         self.body.grid(row = 1, column = 0, **c.GRID_STICKY, padx = (20, 20))
 
         self.columnconfigure(0, weight = 1)
-        self.rowconfigure(0, weight = 1)
         self.rowconfigure(1, weight = 1)
 
         self.title_id = self.get_startup_title_id()
@@ -347,11 +335,25 @@ class TvTracker(tk.Frame):
 
 if __name__ == "__main__":
     root = tk.Tk()
-    style = ttk.Style()
+    style = ttk.Style(root)
     style.configure('entrytag.TMenubutton', font = ("Helvetica", 16))
     root.configure(bg = c.COLOUR_FILM_BACKGROUND, pady = 30)
     root.columnconfigure(0, weight = 1)
     root.rowconfigure(0, weight = 1)
     ft = TvTracker(root, bg = c.COLOUR_TV_BACKGROUND)
     ft.grid(row = 0, column = 0, **c.GRID_STICKY)
+
+    style.configure(
+        "EpisodeTable.Treeview", fieldbackground="white",
+        font = ('Calibri', 20), rowheight = 40, relief = 'flat'
+        )
+    style.map(
+        'EpisodeTable.Treeview', background=[('selected', '#F5F5F5')],
+        foreground=[('selected', 'black')]
+        )
+    style.configure(
+        "EpisodeTable.Treeview.Heading", font = ('Calibri', 20,'bold'),
+        padding = 5, rowheight = 60
+        )
+
     root.mainloop()
