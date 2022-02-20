@@ -556,10 +556,15 @@ class FlexLabel(tk.Label):
             _font_argument = tkf.nametofont(self.cget('font'))
 
         # convert to a tk.font.Font object
-        self._default_font = self._get_font_object(_font_argument)
-        self._default_font_size = self._default_font.cget('size')
+        used_font = self._get_font_object(_font_argument)
+        self.config(font = used_font)
+        self._current_font = used_font
+        self._default_font = used_font.copy()
+        self._default_font_size = used_font.cget('size')
+        self._link = None
 
-        self.bind("<Configure>", self._fit_text)
+        self._fit_binding = self.bind("<Configure>", self._fit_text, add = "+")
+        self._last_fit_text = datetime.min
 
     @log_class
     def _get_font_object(self, font_arg):
@@ -572,30 +577,55 @@ class FlexLabel(tk.Label):
 
     @log_class
     def _fit_text(self, *args, **kwargs):
-        text = self.cget('text')
-        self.config(font = self._get_font(text))
+        if (datetime.now() - self._last_fit_text).total_seconds() < 0.15:
+            return
+
+        self._last_fit_text = datetime.now()
+        self._get_font(self.cget('text'))
+        self.event_generate("<<FitText>>")
 
     @log_class
-    def _get_font(self, text):
-        """ Get the font needed to fit the given text into the widget """
+    def _get_font(self, text = None):
+        """ Get the font needed to fit the given text into the widget. If
+        text is None, return the currently used font. """
+        if text is None:
+            return self._current_font
+
         width = self._default_font.measure(text)
+        height = self._default_font.metrics()['linespace']
         w_width, w_height = self.winfo_width(), self.winfo_height()
 
         # width is <=1 during startup
-        if w_width <= 1: return self.font_count
+        if w_width <= 1:
+            return self._current_font
 
         font = self._default_font.copy()
         font_size = self._default_font_size
         # decrease font size until it fits both width and height
-        while width > w_width or font.metrics()['linespace'] > w_height:
+        while width > w_width or height > w_height:
             font.config(size = font_size)
-            # size 1 is the smallest possible font, so use as default in the
-            # case that no size font will fit in the available space
-            if font_size == 1: return font
+            # size 1 is the default when no size will fit
+            if font_size == 1:
+                break
             width = font.measure(text)
+            height = font.metrics()['linespace']
             font_size -= 1
-        return font
+        self._current_font.config(size = font_size)
 
+    @log_class
+    def link(self, other):
+        """ Link to another instance of FlexLabel so that their fonts change
+        together. The font of self is taken from the linked instance other """
+        if not isinstance(other, FlexLabel):
+            raise ValueError("Linked object must be instance of FlexLabel")
+        elif other == self:
+            return
+        # remove the fit_text binding
+        self.unbind("<Configure>", self._fit_binding)
+        self._link = other
+        self._current_font = other._get_font()
+        # use the same font object as the linked widget
+        self.config(font = self._current_font)
 
 # test = "RatingDisplay"
 # test = "TitleModule"
@@ -662,7 +692,13 @@ if __name__ == "__main__":
     elif test == "FlexLabel":
         title = FlexLabel(root, text = "this is some test text", font = ("Arial", 45, "bold"))
         title.grid(row = 0, column = 0, sticky = "nesw")
+
+        title2 = FlexLabel(root, text = "this is short txt")
+        title2.link(title)
+        title2.grid(row = 1, column = 0, sticky = "nesw")
+
         root.rowconfigure(0, weight = 1)
+        root.rowconfigure(1, weight = 1)
         root.columnconfigure(0, weight = 1)
 
     root.mainloop()
