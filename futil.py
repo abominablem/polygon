@@ -68,3 +68,6 @@ def format_time(time, unit = "seconds", round_to = "seconds"):
 
 def get_tk(widget):
     return widget.nametowidget(".")
+
+def null_function(*args, **kwargs):
+    return
