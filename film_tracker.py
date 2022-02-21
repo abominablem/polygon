@@ -401,7 +401,7 @@ class FilmTracker(tk.Frame):
         self.film_request.start()
 
     @log_class
-    def log_entry(self, event):
+    def log_entry(self, event = None):
         title_id = self.film_request.get_value()
         # get the title object for this id
         title = imdbf.get_title(title_id)
@@ -435,7 +435,7 @@ class FilmTracker(tk.Frame):
         self.dim(transparency = 1)
 
     @log_class
-    def add_entry(self, event):
+    def add_entry(self, event = None):
         entry_dict = self.log_entry_window.get_dict()
         entry_dict["title_id"] = self.log_entry_window.title_id
         self.log_entry_window.destroy()
