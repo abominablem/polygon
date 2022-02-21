@@ -554,8 +554,8 @@ class IMDbFunctions:
         return self.titles.get(title_id, refresh)
 
     @log_class
-    def get_series_with_entries(self, title_id):
-        series = self.get_series(title_id, get_episodes = True, refresh = False)
+    def get_series_with_entries(self, title_id, refresh):
+        series = self.get_series(title_id, get_episodes = True, refresh = refresh)
         for episode in series.episodes:
             episode.entry = Entry(episode.title_id)
         return series
