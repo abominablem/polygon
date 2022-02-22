@@ -10,186 +10,16 @@ sys.path.append("D:\\Users\\Marcus\\Documents\\R Documents\\Coding\\Python\\Pack
 import tkinter as tk
 from tkinter import ttk
 from datetime import datetime
-import re
 
 from mh_logging import log_class
 import tk_arrange as tka
-import described_widgets as dw
 import constants as c
-import base
 from futil import get_tk, format_time
 from imdb_functions import imdbf
 from widgets import TitleModule, Counter, Padding, RangeDisplay, PolygonButton
 from log_entry import LogEntryWindow
 
 log_class = log_class(c.LOG_LEVEL)
-
-class RequestFilmWindow(tk.Toplevel):
-    """ Window to get user film input, either as an IMDb ID or by searching for
-    a film title """
-    @log_class
-    def __init__(self, master, type = "movie", *args, **kwargs):
-        self.type = type
-        super().__init__(master, *args, **kwargs)
-        self.window = get_tk(self)
-        self.window.eval(f'tk::PlaceWindow {self} center')
-
-        self.widget_frame = base.TrimmedFrame(
-            self, bg = c.COLOUR_FILM_BACKGROUND,
-            inner_colour = c.COLOUR_INTERFACE_BUTTON
-            )
-        self.widget_frame.grid(row = 0, column = 0, **c.GRID_STICKY)
-
-        self.primary_search_frame = tk.Frame(
-            self.widget_frame.inner, bg = c.COLOUR_FILM_BACKGROUND
-            )
-        self.text = tk.Label(
-            self.primary_search_frame, fg = c.COLOUR_OFFWHITE_TEXT,
-            font = ("Helvetica", 24), bg = c.COLOUR_FILM_BACKGROUND,
-            text = "Enter an IMDb ID or search for a film title:"
-            )
-        self.text.bind("<Return>", self.search)
-
-        self.search_trim = base.TrimmedFrame(self.primary_search_frame, height = 20)
-        self.search_trim.outer.config(highlightthickness = 4)
-        self.search_text = tk.Entry(
-            self.search_trim.inner, width = 20, font = ("Helvetica", 16)
-            )
-        self.search_trim.columnconfigure(0, weight = 1)
-        self.search_text.grid(row = 0, column = 0, **c.GRID_STICKY)
-
-        self.btn_close = tk.Button(
-            self.primary_search_frame, command = self.destroy,
-            text = "Close", font = ("Helvetica", 24, )
-            )
-        self.btn_search = tk.Button(
-            self.primary_search_frame, command = self.search,
-            text = "Search", font = ("Helvetica", 24, )
-            )
-
-        widgets = {1: {'widget': self.text,
-                       'grid_kwargs': {**c.GRID_STICKY, "padx": 15, "pady": 15},
-                       'stretch_width': True},
-                   2: {'widget': self.search_trim,
-                       'grid_kwargs': {**c.GRID_STICKY, "pady": 5, "padx": 10},
-                       'stretch_width': True},
-                   3: {'widget': self.btn_close,
-                       'grid_kwargs': {**c.GRID_STICKY, "pady": 5, "padx": 5}},
-                   4: {'widget': self.btn_search,
-                       'grid_kwargs': {**c.GRID_STICKY, "pady": 5, "padx": 5}},
-                   -1: {'widget_kwargs': {"bg": c.COLOUR_FILM_BACKGROUND}}
-                   }
-        self.primary_search_set = tka.WidgetSet(
-            self.primary_search_frame, widgets, [[1], [2], [3, 4]]
-            )
-        self.primary_search_frame.grid(row = 0, column = 0, **c.GRID_STICKY)
-
-        # frame to hold the secondary search widgets to display search results
-        self.secondary_search_frame = tk.Frame(
-            self.widget_frame.inner, bg = c.COLOUR_FILM_BACKGROUND
-            )
-        self.search_results = dw.SimpleTreeview(
-            self.secondary_search_frame,
-            colsdict = {1: {"header": "", "width": 1,
-                            "stretch": True, "anchor": "w"},
-                        2: {"header": "Type", "width": 50,
-                            "stretch": False, "anchor": "center"},
-                        3: {"header": "Title", "width": 500,
-                            "stretch": True, "anchor": "w"},}
-            )
-        self.search_results.bind("<Double-1>", self.select_search_result)
-        self.search_results.grid(row = 0, column = 0, pady = (5, 15), padx = 10)
-        self.secondary_search_frame.columnconfigure(0, weight = 1)
-        self.secondary_search_frame.rowconfigure(0, weight = 1)
-
-        self.search_text.focus_force()
-
-        self.bind("<Escape>", lambda event: self.destroy())
-        self.bind("<Return>", self.search)
-        self.protocol("WM_DELETE_WINDOW", self.destroy)
-
-    @log_class
-    def destroy(self, *args):
-        self.event_generate("<<Destroy>>")
-        super().destroy()
-
-    @log_class
-    def search(self, *args, **kwargs):
-        """ Called from btn_search """
-        search_text = self.search_text.get().strip()
-        if self.is_imdb_id(search_text):
-            self.set_value(search_text)
-        else:
-            search_results = imdbf.search_title(search_text, type = self.type)
-            self.load_search_results(search_results)
-            self.add_secondary_search_widgets()
-
-    @log_class
-    def add_secondary_search_widgets(self):
-        """ Display the search results widgets """
-        self.secondary_search_frame.grid(row = 1, column = 0, **c.GRID_STICKY)
-
-    @log_class
-    def _search_results_values(self, res_dict):
-        """ Get the value lists needed for the result treeview from the search
-        results dict """
-        episode = ("E%02d" % int(res_dict["episode"])
-                   if res_dict["episode"] != "" else "")
-        season = ("S%02d" % int(res_dict["season"])
-                  if res_dict["season"] != "" else "")
-        series_ending = (" (%s : %s%s)" % (res_dict["episode of"], season, episode)
-                         if episode != "" else "")
-
-        title = res_dict["title"] + series_ending + " (%s)" % res_dict["year"]
-        return [res_dict["type"], title]
-
-    @log_class
-    def load_search_results(self, results):
-        """ Load a dictionary of search results into the results treeview """
-        self.search_results.clear()
-        for i, result_dict in enumerate(results):
-            self.search_results.insert(
-                '', 'end', iid = result_dict["title_id"],
-                values = self._search_results_values(result_dict)
-                )
-
-    @log_class
-    def select_search_result(self, *args, **kwargs):
-        """ Called when a search result is chosen """
-        title_id = self.search_results.events["<Double-1>"]["row"]
-        self.set_value(title_id)
-
-    @log_class
-    def is_imdb_id(self, text):
-        """ Return bool, if text is formatted like an IMDb ID. This says
-        nothing about if it is a *valid* ID or not. """
-        # remove leading "tt"
-        if text[0:2] == "tt":
-            text = text[2:]
-        # test for 7/8 digit number (imdb title ID)
-        if re.match("\d{7,8}", text):
-            return True
-        else:
-            return False
-
-    @log_class
-    def start(self):
-        self.window.eval(f'tk::PlaceWindow {self} center')
-        self.overrideredirect(True)
-        self.transient(self.master)
-        self.grab_set()
-        self.lift()
-        self.mainloop()
-
-    @log_class
-    def set_value(self, value):
-        self.user_input = value
-        self.event_generate("<<SetValue>>")
-
-    @log_class
-    def get_value(self):
-        """ Return user input """
-        return self.user_input
 
 class FilmTracker(tk.Frame):
     @log_class
@@ -394,7 +224,7 @@ class FilmTracker(tk.Frame):
     @log_class
     def add_new(self, *args, **kwargs):
         """ Called from the add new button (+) """
-        self.film_request = RequestFilmWindow(self)
+        self.film_request = RequestTitleWindow(self)
         self.film_request.bind("<<SetValue>>", self.log_entry)
         self.film_request.bind("<<Destroy>>", self.undim)
         self.dim(transparency = 0.7)
