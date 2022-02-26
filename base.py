@@ -88,7 +88,6 @@ class PolygonWindowBase:
 
     @log_class
     def start(self):
-        # self.window.transient(self.master)
         self.window.grab_set()
         self.window.mainloop()
 
