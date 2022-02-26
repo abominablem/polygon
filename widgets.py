@@ -6,6 +6,7 @@ Created on Sun Jan 23 21:02:39 2022
 """
 
 import tkinter as tk
+from tkinter import ttk
 import tkinter.font as tkf
 from datetime import datetime
 import math
@@ -19,7 +20,7 @@ from mh_logging import log_class
 import constants as c
 import futil as futil
 import base
-from imdb_functions import imdbf
+from imdb_functions import imdbf, standardise_id
 
 log_class = log_class(c.LOG_LEVEL)
 
@@ -546,7 +547,6 @@ class Padding(tk.Label):
         kwargs["text"] = ""
         super().__init__(master, *args, **kwargs)
 
-
 class FlexLabel(tk.Label):
     """ Label with text that fits to the size of the widget """
     @log_class
@@ -630,6 +630,124 @@ class FlexLabel(tk.Label):
         # use the same font object as the linked widget
         self.config(font = self._current_font)
 
+class OptionList(tk.Toplevel):
+    """ Window to get user input by selecting from a list of values. Optionally
+    include a search bar at the top """
+    @log_class
+    def __init__(self, master, title = "Options", search = True, anchor = "w",
+                 toplevel_kwargs = None, width = 300, height = 500,
+                 *args, **kwargs):
+        toplevel_kwargs = {} if toplevel_kwargs is None else toplevel_kwargs
+        super().__init__(master, **toplevel_kwargs, width = width,
+                         height = height)
+        self.rowconfigure(0, weight = 1)
+        self.columnconfigure(0, weight = 1)
+
+        self.window = futil.get_tk(self)
+        self.include_search = search
+
+        self.frame = base.TrimmedFrame(
+            self, bg = c.COLOUR_BACKGROUND, width = width, height = height
+            )
+        self.frame.grid(row = 0, column = 0, **c.GRID_STICKY)
+
+        if self.include_search:
+            self.search_value = tk.StringVar()
+            self.search_value.trace_add("write", self._write_value)
+            self.search_box = ttk.Entry(
+                self.frame.inner, justify = "left",
+                textvariable = self.search_value
+                )
+            # if 'style' in kwargs:
+            #     self.search_box.config(style = kwargs['style'])
+            self.search_box.grid(row = 1, column = 0, **c.GRID_STICKY)
+
+        self.table = dw.SimpleTreeview(
+            self.frame.inner,
+            colsdict = {1: {"header": title, "width": width,
+                            "stretch": True, "anchor": anchor},}
+            , *args, **kwargs
+            )
+        self.table.grid(row = 0, column = 0, **c.GRID_STICKY)
+        self.frame.inner.rowconfigure(1, weight = 1)
+
+        self.value = None
+        self.options = []
+        self.table.bind("<Double-1>", self._set_value)
+
+        self.bind("<Escape>", lambda event: self.destroy())
+        self.table.bind("<Escape>", lambda event: self.destroy())
+        self.bind("<Return>", self._enter)
+
+    @log_class
+    def set(self, options):
+        """ Set the options, either as a list of values, or a dictionary of
+        iid: text pairs """
+        self.options = options
+        self.load_options(options)
+
+    @log_class
+    def load_options(self, options):
+        self.table.clear()
+        if isinstance(options, list):
+            for option in options:
+                self.table.insert("", "end", iid = option, text = option)
+        elif isinstance(options, dict):
+            for iid, text in options.items():
+                self.table.insert("", "end", iid = iid, text = text)
+        else:
+            raise ValueError("Options argument must be list of values or "
+                             "dictionary of iid: text pairs")
+
+    @log_class
+    def get(self):
+        return self.value
+
+    @log_class
+    def _enter(self, event = None):
+        # set value as the first row
+        self.value = self.table.get_children()[0]
+        self.event_generate("<<SetValue>>")
+
+    @log_class
+    def _set_value(self, event):
+        self.value = self.table.events["<Double-1>"]["row"]
+        self.event_generate("<<SetValue>>")
+
+    @log_class
+    def start(self):
+        self.window.eval(f'tk::PlaceWindow {self} center')
+        self.overrideredirect(True)
+        self.transient(self.master)
+        self.grab_set()
+        self.lift()
+
+        if self.include_search:
+            self.search_box.focus_force()
+        else:
+            self.table.focus_force()
+
+        self.mainloop()
+
+    @log_class
+    def _write_value(self, *args):
+         text = self.search_value.get()
+         self.search(text)
+
+    @log_class
+    def search(self, text):
+        options = self.options
+        if isinstance(options, list):
+            suboptions = [option for option in options
+                          if self._matches(text, option)]
+        elif isinstance(options, dict):
+            suboptions = {iid: option for iid, option in options.items()
+                          if self._matches(text, option)}
+        self.load_options(suboptions)
+
+    @staticmethod
+    def _matches(text, option):
+        return text.lower() in option.lower()
 
 class RequestTitleWindow(tk.Toplevel):
     """ Window to get user film input, either as an IMDb ID or by searching for
@@ -650,10 +768,13 @@ class RequestTitleWindow(tk.Toplevel):
         self.primary_search_frame = tk.Frame(
             self.widget_frame.inner, bg = c.COLOUR_FILM_BACKGROUND
             )
+        title_type = {
+            "movie": "film", "tv": "series", "episode": "episode"
+            }[self.type]
         self.text = tk.Label(
             self.primary_search_frame, fg = c.COLOUR_OFFWHITE_TEXT,
             font = ("Helvetica", 24), bg = c.COLOUR_FILM_BACKGROUND,
-            text = "Enter an IMDb ID or search for a film title:"
+            text = "Enter an IMDb ID or search for a %s title:" % title_type
             )
         self.text.bind("<Return>", self.search)
 
@@ -764,6 +885,7 @@ class RequestTitleWindow(tk.Toplevel):
     def select_search_result(self, *args, **kwargs):
         """ Called when a search result is chosen """
         title_id = self.search_results.events["<Double-1>"]["row"]
+        title_id = standardise_id(title_id)
         self.set_value(title_id)
 
     @log_class
