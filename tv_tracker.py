@@ -8,7 +8,7 @@ import sys
 sys.path.append("D:\\Users\\Marcus\\Documents\\R Documents\\Coding\\Python\\Packages")
 import tkinter as tk
 from tkinter import ttk
-import tkinter.font as tkf
+# import tkinter.font as tkf
 from datetime import datetime
 
 from mh_logging import log_class
@@ -18,12 +18,10 @@ import constants as c
 import base
 import futil
 from imdb_functions import imdbf
-from widgets import FlexLabel, Counter, Padding, RangeDisplay, PolygonButton
+from widgets import RequestTitleWindow, PolygonButton, OptionList
 from log_entry import LogEntryWindow
-# from film_tracker import RequestFilmWindow
 
 log_class = log_class(c.LOG_LEVEL)
-# log_class = log_class("min")
 
 class RequestTVWindow:
     @log_class
@@ -116,7 +114,7 @@ class CompletionTracker(base.TrimmedFrame):
                 "stretch": True, "anchor": "center"},
             }
         self.table = dw.SimpleTreeview(
-            self.inner, columns, style = "EpisodeTable.Treeview", edit = True
+            self.inner, columns, style = "EpisodeTable.Treeview", edit = False
             )
         self.table.grid(row = 0, column = 0, **c.GRID_STICKY)
         self.rowconfigure(0, weight = 1)
@@ -174,8 +172,9 @@ class EpisodeTable(base.TrimmedFrame):
                 "stretch": False, "anchor": "center"},
             }
         self.table = dw.SimpleTreeview(
-            self.inner, columns, style = "EpisodeTable.Treeview", edit = True,
-            edit_focus_lost_confirm = True, edit_font = ('Calibri', 20)
+            self.inner, columns, style = "EpisodeTable.Treeview",
+            edit = {"focus_lost_confirm": True, "font": ('Calibri', 20),
+                    "event": "<1>"},
             )
         self.table.grid(row = 0, column = 0, **c.GRID_STICKY)
 
@@ -261,6 +260,7 @@ class TvTracker(tk.Frame):
         self.btn_deincrement.bind("<Shift-1>", self.decrement_all)
 
         self.episode_table = EpisodeTable(self.widget_frame)
+        self.episode_table.table.bind("<Double-1>", self._double_episode_row)
 
         self.btn_save = PolygonButton(
             self.widget_frame, text = "💾", command = self._click_save,
@@ -325,13 +325,13 @@ class TvTracker(tk.Frame):
             11: {'widget': self.btn_add_new,
                 'grid_kwargs': {**c.GRID_STICKY, "pady": (20, 40), "padx": 20}},
             12: {'widget': self.season_display,
-                'grid_kwargs': {**c.GRID_STICKY, "padx": (30, 1), "pady": (10, 30)},
-                'stretch_width': True, 'stretch_width_weight': 0},
+                'grid_kwargs': {**c.GRID_STICKY, "padx": (30, 1), "pady": (10, 30)}},
             13: {'widget': self.btn_increment,
                 'grid_kwargs': {**c.GRID_STICKY, "padx": 2, "pady": (10, 0)}},
             14: {'widget': self.btn_deincrement,
                 'grid_kwargs': {**c.GRID_STICKY, "padx": 2, "pady": (0, 30)}},
             -1: {'widget_kwargs': {"bg": c.COLOUR_TV_BACKGROUND},
+                'grid_kwargs': c.GRID_STICKY,
                  'stretch_height': True, 'stretch_width': True, }
             }
         self.widget_set = tka.WidgetSet(
@@ -348,21 +348,66 @@ class TvTracker(tk.Frame):
                       [1, -1, 9, 9]]
             )
         self.widget_set.grid(row = 0, column = 0, **c.GRID_STICKY, padx = (20, 40))
-
         self.columnconfigure(0, weight = 1)
-        self.rowconfigure(1, weight = 1)
+        self.rowconfigure(0, weight = 1)
 
         self.series = None
         self.title_id = self.get_startup_title_id()
-        season = self.get_first_incomplete_series(self.title_id)
+        season = self.get_first_incomplete_season(self.title_id)
         self.season_display.set(season)
 
         self.update_table()
 
     @log_class
-    def log_entry(self, event = None):
-        return
-        title_id = self.film_request.get_value()
+    def add_series(self, title):
+        """ Add a new series to the database """
+        # Get a title object with imdbpy.Movie object embedded
+        if not hasattr(title, '_title'):
+            title = imdbf.get_title(title.title_id, get_episodes = False,
+                                    refresh = True)
+        seasons = title.get_episodes(basic_only = True)
+        num_episodes = sum([len(season) for season in seasons])
+
+
+
+    @log_class
+    def confirm_tv_request(self, event = None):
+        title_id = self.tv_request.get_value()
+        self.tv_request.destroy()
+        self.log_entry(title_id)
+
+    @log_class
+    def log_entry(self, title_id):
+        # get the title object for this id
+        title = imdbf.get_title(title_id, get_episodes = False)
+
+        if title.type in c.TV_TYPES:
+            self.add_series(title)
+
+        elif title.type in c.EPISODE_TYPES:
+            # dim the window in the background for better contrast
+            self.dim(transparency = 0.7)
+
+            # open the window to log the entry
+            self.log_entry_window = LogEntryWindow(
+                self, bg = c.COLOUR_TRANSPARENT
+                )
+            self.log_entry_window.title_id = title.title_id
+            title_dict = title.get_dict("title")
+            title_dict_subset = {
+                key: title_dict[key] for key in
+                ["title", "year", "director", "runtime"]
+                }
+            season = self.season_display.get()
+            episode = self.episode_table.table.item(title_id)["text"]
+            subtitle = "%s S%sE%s" % (title.series.title, season, episode)
+            title_dict_subset["original_title"] = subtitle
+
+            title_dict_subset["date"] = datetime.now().strftime("%Y-%m-%d")
+            self.log_entry_window.set_text(**title_dict_subset)
+            self.log_entry_window.bind("<<Destroy>>", self.undim)
+            self.log_entry_window.bind("<<LogEntry>>", self.add_entry)
+            self.log_entry_window.start()
 
     @log_class
     def dim(self, transparency = 0.5):
@@ -374,6 +419,7 @@ class TvTracker(tk.Frame):
 
     @log_class
     def add_entry(self, event = None):
+        return
         entry_dict = self.log_entry_window.get_dict()
         entry_dict["title_id"] = self.log_entry_window.title_id
         self.log_entry_window.destroy()
@@ -384,8 +430,12 @@ class TvTracker(tk.Frame):
 
     @log_class
     def add_new(self, *args, **kwargs):
-        pass #TODO open film request window
-        # self.log_entry()
+        """ Called from the add new button (+) """
+        self.tv_request = RequestTitleWindow(self, type = "tv")
+        self.tv_request.bind("<<SetValue>>", self.confirm_tv_request)
+        self.tv_request.bind("<<Destroy>>", self.undim)
+        self.dim(transparency = 0.7)
+        self.tv_request.start()
 
     @log_class
     def increment(self, *args, **kwargs):
@@ -446,7 +496,7 @@ class TvTracker(tk.Frame):
         return result[0][0]
 
     @log_class
-    def get_first_incomplete_series(self, series_id):
+    def get_first_incomplete_season(self, series_id):
         query = """ SELECT MIN(season) FROM episodes ep
                     LEFT JOIN entries e
                     ON ep.title_id = e.title_id
@@ -476,7 +526,31 @@ class TvTracker(tk.Frame):
 
     @log_class
     def _click_search(self, event = None):
-        pass
+        series_dict = self.get_series_list()
+        self.series_list = OptionList(
+            self, style = "SeriesList.Treeview", width = 350, height = 700,
+            title = "Series"
+            )
+        self.series_list.set(series_dict)
+        self.series_list.bind("<<SetValue>>", self._series_select)
+        self.series_list.start()
+
+    @log_class
+    def _series_select(self, event = None):
+        series_id = self.series_list.get()
+        self.series_list.destroy()
+        self.title_id = series_id
+        self.update_table()
+
+    @log_class
+    def get_series_list(self) -> dict:
+        query = """SELECT title_id, (title || ' (' || CAST(year AS NVARCHAR(4))
+                   || ')') AS title FROM titles
+                   WHERE type IN ('%s')""" % "', '".join(c.TV_TYPES)
+        result = base.polygon_db.titles.select(query)
+        result_dict = {title_id: title for title_id, title in result}
+        return result_dict
+
 
     @log_class
     def _click_random(self, event = None):
@@ -485,6 +559,11 @@ class TvTracker(tk.Frame):
     @log_class
     def _click_further_details(self, event = None):
         pass
+
+    @log_class
+    def _double_episode_row(self, event):
+        title_id = self.episode_table.table.events["<Double-1>"]["row"]
+        self.log_entry(title_id)
 
 
 if __name__ == "__main__":
@@ -508,6 +587,14 @@ if __name__ == "__main__":
     style.configure(
         "EpisodeTable.Treeview.Heading", font = ('Calibri', 20,'bold'),
         padding = 5, rowheight = 60
+        )
+    style.configure(
+        "SeriesList.Treeview.Heading", font = ('Calibri', 15,'bold'),
+        padding = 5, rowheight = 30
+        )
+    style.configure(
+        "SeriesList.Treeview", font = ('Calibri', 12),
+        padding = 5, rowheight = 20
         )
 
     root.mainloop()
