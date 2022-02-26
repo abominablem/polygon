@@ -14,7 +14,7 @@ import constants as c
 import futil as f
 import base
 from mh_logging import log_class
-log_class = log_class("None")
+log_class = log_class(c.LOG_LEVEL)
 
 imdb = IMDb()
 
@@ -33,7 +33,8 @@ def standardise_id(imdb_id):
 
 class Title:
     @log_class
-    def __init__(self, title_id = None, detail = None):
+    def __init__(self, title_id = None, detail = None, get_episodes = False):
+        self._get_episodes = False
         if not title_id is None:
             self.clear()
             movie = imdb.get_movie(clean_id(title_id))
@@ -74,7 +75,8 @@ class Title:
 
         elif self.type in c.TV_TYPES:
             self.series_id = self.title_id
-            self.get_episodes()
+            if self._get_episodes:
+                self.get_episodes()
 
         self.title = self._data["title"]
         self.year = self._data_get("year", None)
@@ -228,10 +230,10 @@ class Title:
         return release_date
 
     @log_class
-    def get_series(self):
+    def get_series(self, get_episodes = False):
         """ Return Title object of parent series """
         if self.type == "episode":
-            return Title().from_object(self._date["episode of"])
+            return Title(get_episodes = get_episodes).from_object(self._data["episode of"])
         elif self.type in c.TV_TYPES:
             return self
         else:
@@ -273,10 +275,12 @@ class Title:
         try:
             if self.type == "episode":
                 date = "??" if self.release_date is None else self.release_date
-                return "<%s : %s : %s S%02dE%02d %s (%s)>" % (
+                season = "??" if self.season == 'unknown' else self.season
+                episode = "??" if self.episode == 'unknown' else self.episode
+                return "<%s : %s : %s S%sE%s %s (%s)>" % (
                     self.title_id, self.type,
-                    self._data["episode of"].get("title"), self.season,
-                    self.episode, self.title, date
+                    self._data["episode of"].get("title"), season, episode,
+                    self.title, date
                     )
             elif self.type == "series":
                 return "<%s : %s : %s (%s)>" % (
@@ -537,8 +541,9 @@ class IMDbFunctions:
         search_results = imdb.search_movie(search_text)
         if not type is None:
             try:
-                type_filter = {"movie": c.MOVIE_TYPES, "tv": c.TV_TYPES,
-                               "episode": ["episode"]}[type]
+                type_filter = {"movie": c.MOVIE_TYPES,
+                               "tv": c.TV_TYPES,
+                               "episode": c.EPISODE_TYPES}[type]
             except KeyError:
                 if not isinstance(type, list): type_filter = [type]
 
@@ -550,8 +555,13 @@ class IMDbFunctions:
                 for movie in results_filtered]
 
     @log_class
-    def get_title(self, title_id, refresh = False):
-        return self.titles.get(title_id, refresh)
+    def get_title(self, title_id, refresh = False, get_episodes = False):
+        title = self.titles.get(title_id, refresh, get_episodes)
+        if title.type in c.EPISODE_TYPES:
+            if not hasattr(title, 'series_id'):
+                title.series_id = self.episodes.get_series_id(title_id)
+            title.series = self.titles.get(title.series_id, refresh)
+        return title
 
     @log_class
     def get_series_with_entries(self, title_id, refresh):
@@ -565,10 +575,10 @@ class IMDbFunctions:
         series = self.get_title(title_id, refresh)
         if get_episodes:
             series.episodes = self.get_episodes(title_id, refresh)
-        seasons = {episode.season for episode in series.episodes}
-        series.seasons = {season: [] for season in seasons}
-        for episode in series.episodes:
-            series.seasons[episode.season].append(episode)
+            seasons = {episode.season for episode in series.episodes}
+            series.seasons = {season: [] for season in seasons}
+            for episode in series.episodes:
+                series.seasons[episode.season].append(episode)
         return series
 
     @log_class
@@ -618,10 +628,10 @@ class IMDbBaseTitleFunctions:
         return detail
 
     @log_class
-    def get(self, imdb_id, refresh = False):
+    def get(self, imdb_id, refresh = False, get_episodes = False):
         """ Get Title object. Optionally refresh from latest IMDb data."""
         if refresh:
-            return Title(title_id = imdb_id)
+            return Title(title_id = imdb_id, get_episodes = get_episodes)
         else:
             try:
                 return Title(detail = self.get_detail(imdb_id))
@@ -674,6 +684,15 @@ class IMDbEpisodesFunctions(IMDbBaseTitleFunctions):
             filters = {"series_id": series_id}, return_cols = "*",
             rc = "rowdict"
             )
+        return detail
+
+    @log_class
+    def get_series_id(self, title_id):
+        """ Get the corresponding series_id for an episode title_id """
+        detail = self.episodes_db.filter(
+            filters = {"title_id": title_id}, return_cols = "series_id",
+            rc = "columns"
+            )["series_id"][0]
         return detail
 
 class IMDbSeriesFunctions(IMDbBaseTitleFunctions):
