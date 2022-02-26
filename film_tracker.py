@@ -16,7 +16,8 @@ import tk_arrange as tka
 import constants as c
 from futil import get_tk, format_time
 from imdb_functions import imdbf
-from widgets import TitleModule, Counter, Padding, RangeDisplay, PolygonButton
+from widgets import (TitleModule, Counter, Padding, RangeDisplay, PolygonButton,
+                     RequestTitleWindow)
 from log_entry import LogEntryWindow
 
 log_class = log_class(c.LOG_LEVEL)
@@ -424,6 +425,6 @@ if __name__ == "__main__":
     root.configure(bg = c.COLOUR_FILM_BACKGROUND, pady = 30)
     # root.overrideredirect(True)
     root.columnconfigure(0, weight = 1)
-    ft = FilmTracker(root, bg = c.COLOUR_BACKGROUND)
+    ft = FilmTracker(root, bg = c.COLOUR_FILM_BACKGROUND)
     ft.grid(row = 0, column = 0, **c.GRID_STICKY)
     root.mainloop()
