@@ -921,6 +921,80 @@ class RequestTitleWindow(tk.Toplevel):
         return self.user_input
 
 
+class PolygonProgressBar(tk.Toplevel):
+    """ Window to get user film input, either as an IMDb ID or by searching for
+    a film title """
+    @log_class
+    def __init__(self, master, maximum = 1, width = 400, height = 100,
+                  style = None, *args, **kwargs):
+        self.type = type
+        self.value = tk.IntVar()
+        self.maximum = maximum
+        super().__init__(master, width = width, height = height, *args, **kwargs)
+        self.window = futil.get_tk(self)
+        self.window.eval(f'tk::PlaceWindow {self} center')
+
+        self.frame = base.TrimmedFrame(self, bg = c.COLOUR_BACKGROUND,
+                                        width = width, height = height)
+        self.frame.inner.config(width = width, height = height)
+        self.frame.grid(row = 0, column = 0, **c.GRID_STICKY)
+
+        self.progress = ttk.Progressbar(
+            self.frame.inner, maximum = maximum, length = width,
+            variable = self.value, mode = 'determinate', orient = 'horizontal',
+            )
+        if not style is None:
+            self.progress.config(style = style)
+        self.progress.grid(row = 0, column = 0, **c.GRID_STICKY,
+                            ipady = int(height/2 - 20))
+
+        self.rowconfigure(0, weight = 1)
+        self.columnconfigure(0, weight = 1)
+
+        self.style_used = "Horizontal.TProgressbar" if style is None else style
+        self.style = ttk.Style()
+
+    @log_class
+    def start_indeterminate(self, *args):
+        self.progress.config(mode = 'indeterminate', maximum = 10)
+        self.progress.start(interval = 50)
+
+    @log_class
+    def stop_indeterminate(self, *args):
+        self.progress.stop()
+        self.progress.config(mode = 'determinate', maximum = self.maximum)
+        self.value.set(0)
+
+    @log_class
+    def step(self, cnt):
+        self.value.set(self.get() + cnt)
+        if self.get() == self.maximum:
+            self.after(500, self.destroy)
+        else:
+            completion = int(self.get()/self.maximum * 100)
+            if completion >= 45:
+                self.style.configure(self.style_used, foreground = "white")
+            else:
+                self.style.configure(self.style_used, foreground = "black")
+
+            self.style.configure(self.style_used, text = f'{completion} %')
+
+    @log_class
+    def get(self):
+        return self.value.get()
+
+    @log_class
+    def destroy(self, *args):
+        self.event_generate("<<Destroy>>")
+        super().destroy()
+
+    @log_class
+    def start(self):
+        self.window.eval(f'tk::PlaceWindow {self} center')
+        self.overrideredirect(True)
+        self.grab_set()
+        self.lift()
+        self.mainloop()
 
 
 # test = "RatingDisplay"
