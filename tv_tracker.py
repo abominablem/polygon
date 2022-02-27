@@ -8,8 +8,8 @@ import sys
 sys.path.append("D:\\Users\\Marcus\\Documents\\R Documents\\Coding\\Python\\Packages")
 import tkinter as tk
 from tkinter import ttk
-# import tkinter.font as tkf
 from datetime import datetime
+import random
 
 from mh_logging import log_class
 import tk_arrange as tka
@@ -18,7 +18,9 @@ import constants as c
 import base
 import futil
 from imdb_functions import imdbf
-from widgets import RequestTitleWindow, PolygonButton, OptionList
+import imdb_functions
+from widgets import (RequestTitleWindow, PolygonButton, OptionList,
+                     PolygonProgressBar)
 from log_entry import LogEntryWindow
 
 log_class = log_class(c.LOG_LEVEL)
@@ -56,11 +58,12 @@ class SeasonCounter(tk.Frame):
         self.columnconfigure(0, weight = 1)
 
     @log_class
-    def set(self, count):
-        self.season = int(count)
+    def set(self, count, suppress_event = False):
         count = self.enforce_bounds(count)
+        self.season = int(count)
         self.counter.config(text = "Season %s" % count)
-        self.event_generate("<<SeasonChange>>")
+        if not suppress_event:
+            self.event_generate("<<SeasonChange>>")
 
     @log_class
     def get(self, *args, **kwargs):
@@ -106,11 +109,13 @@ class CompletionTracker(base.TrimmedFrame):
         super().__init__(master, **kwargs)
 
         columns = {
-            1: {"header": "Season", "width": 110,
+            1: {"header": "", "width": 1,
+                "stretch": False, "anchor": "center"},
+            2: {"header": "Season", "width": 110,
                 "stretch": True, "anchor": "center"},
-            2: {"header": "#", "width": 40,
+            3: {"header": "#", "width": 40,
                 "stretch": True, "anchor": "center"},
-            3: {"header": "%", "width": 80,
+            4: {"header": "%", "width": 80,
                 "stretch": True, "anchor": "center"},
             }
         self.table = dw.SimpleTreeview(
@@ -125,7 +130,8 @@ class CompletionTracker(base.TrimmedFrame):
         self.table.clear()
         for number, season in series.seasons.items():
             self.table.insert(
-                "", "end", iid = number, text = number, values = (
+                "", "end", iid = number, text = "", values = (
+                    number,
                     len(season),
                     self.get_season_completion(season, "percentage")
                     )
@@ -160,7 +166,7 @@ class EpisodeTable(base.TrimmedFrame):
         columns = {
             1: {"header": "#", "width": 70,
                 "stretch": False, "anchor": "center"},
-            2: {"header": "Episode name", "width": 800,
+            2: {"header": "Episode name", "width": 600,
                 "stretch": True, "anchor": "w"},
             3: {"header": "Watched?", "width": 200,
                 "stretch": False, "anchor": "center"},
@@ -174,7 +180,7 @@ class EpisodeTable(base.TrimmedFrame):
         self.table = dw.SimpleTreeview(
             self.inner, columns, style = "EpisodeTable.Treeview",
             edit = {"focus_lost_confirm": True, "font": ('Calibri', 20),
-                    "event": "<1>"},
+                    "event": "<1>", 'columns': ['Episode name']},
             )
         self.table.grid(row = 0, column = 0, **c.GRID_STICKY)
 
@@ -194,8 +200,11 @@ class EpisodeTable(base.TrimmedFrame):
         if not isinstance(titles, list):
             titles = [titles]
 
+        children = self.table.get_children()
         for i, title in enumerate(titles):
             values = self.get_values(title)
+            if title.title_id in children:
+                continue
             self.table.insert("", index = "end", iid = title.title_id,
                               text = title.episode, values = values)
     @log_class
@@ -353,22 +362,46 @@ class TvTracker(tk.Frame):
 
         self.series = None
         self.title_id = self.get_startup_title_id()
-        season = self.get_first_incomplete_season(self.title_id)
-        self.season_display.set(season)
-
         self.update_table()
+        self.bind("<<SeriesChange>>", self._series_change)
+        self.event_generate("<<SeriesChange>>")
 
     @log_class
     def add_series(self, title):
-        """ Add a new series to the database """
+        if not imdbf.exists(title.title_id):
+            """ Add a new series to the database """
+            self.progress_bar = PolygonProgressBar(
+                self, style = "PolygonProgress.Horizontal.TProgressbar")
+            self.progress_bar.start_indeterminate()
+            self.progress_bar.after(100, lambda: self._add_series(title))
+            self.progress_bar.start()
+
+        self.title_id = title.title_id
+        self.update_table()
+        self.event_generate("<<SeriesChange>>")
+
+    @log_class
+    def _add_series(self, title):
+        """ Download episodes and add them to the database """
         # Get a title object with imdbpy.Movie object embedded
         if not hasattr(title, '_title'):
             title = imdbf.get_title(title.title_id, get_episodes = False,
                                     refresh = True)
         seasons = title.get_episodes(basic_only = True)
-        num_episodes = sum([len(season) for season in seasons])
+        imdbf.add_title(title.title_id)
 
+        num_episodes = sum([len(season) for season in seasons.values()])
+        self.progress_bar.stop_indeterminate()
+        self.progress_bar.maximum = num_episodes
 
+        for season in seasons:
+            for episode in seasons[season]:
+                movie = seasons[season][episode]
+                try:
+                    imdbf.add_title(movie.getID())
+                except imdb_functions.EpisodeExistsError:
+                    pass
+                self.progress_bar.step(1)
 
     @log_class
     def confirm_tv_request(self, event = None):
@@ -379,12 +412,18 @@ class TvTracker(tk.Frame):
     @log_class
     def log_entry(self, title_id):
         # get the title object for this id
-        title = imdbf.get_title(title_id, get_episodes = False)
+        title = imdbf.get_title(title_id, get_episodes = False,
+                                refresh = False)
 
         if title.type in c.TV_TYPES:
             self.add_series(title)
 
         elif title.type in c.EPISODE_TYPES:
+            self.title_id = title.series_id
+            season, episode = self.get_title_season_episode(title_id)
+            self.season_display.set(season, suppress_event = True)
+            self.update_table()
+
             # dim the window in the background for better contrast
             self.dim(transparency = 0.7)
 
@@ -398,8 +437,6 @@ class TvTracker(tk.Frame):
                 key: title_dict[key] for key in
                 ["title", "year", "director", "runtime"]
                 }
-            season = self.season_display.get()
-            episode = self.episode_table.table.item(title_id)["text"]
             subtitle = "%s S%sE%s" % (title.series.title, season, episode)
             title_dict_subset["original_title"] = subtitle
 
@@ -408,6 +445,15 @@ class TvTracker(tk.Frame):
             self.log_entry_window.bind("<<Destroy>>", self.undim)
             self.log_entry_window.bind("<<LogEntry>>", self.add_entry)
             self.log_entry_window.start()
+
+    @log_class
+    def get_title_season_episode(self, title_id):
+        result = base.polygon_db.episodes.filter(
+            {'title_id': title_id},
+            return_cols = ['season', 'episode'],
+            rc = 'rowdict'
+            )[0]
+        return (result['season'], result['episode'])
 
     @log_class
     def dim(self, transparency = 0.5):
@@ -419,14 +465,13 @@ class TvTracker(tk.Frame):
 
     @log_class
     def add_entry(self, event = None):
-        return
         entry_dict = self.log_entry_window.get_dict()
         entry_dict["title_id"] = self.log_entry_window.title_id
         self.log_entry_window.destroy()
         self.undim()
         imdbf.add_entry(**entry_dict)
-        self.query_data()
-        self.set_counter_range()
+        self.series = self.get_series_db()
+        self.update_table()
 
     @log_class
     def add_new(self, *args, **kwargs):
@@ -454,31 +499,47 @@ class TvTracker(tk.Frame):
         self.season_display.set(self.season_display.minimum)
 
     @log_class
-    def update_table(self, *args, **kwargs):
+    def _series_change(self, event):
+        season = self.get_first_incomplete_season(self.title_id)
+        self.season_display.set(season)
+
+    @log_class
+    def update_table(self, event = None, refresh = False, *args, **kwargs):
         self.episode_table.clear()
         title_id = self.title_id
+
+        self.series = self.get_series(title_id, refresh = refresh)
         season = self.season_display.get()
-        series = self.get_series(title_id)
 
-        self.season_display.set_maximum(max(series.seasons))
-        self.season_display.set_minimum(min(series.seasons))
+        self.season_display.set_maximum(max(self.series.seasons))
+        self.season_display.set_minimum(min(self.series.seasons))
 
-        self.show_title.config(text = series.title)
-        self.completion_tracker.update(series)
-        episodes = series.seasons[season]
+        self.show_title.config(text = self.series.title)
+        self.completion_tracker.update(self.series)
+
+        try:
+            episodes = self.series.seasons[season]
+        except KeyError:
+            episodes = self.series.seasons[list(self.series.seasons.keys())[0]]
 
         self.episode_table.add_episodes(episodes)
 
     @log_class
+    def get_series_db(self):
+        self.series = None
+        return self.get_series(self.title_id)
+
+    @log_class
     def get_series(self, title_id, refresh = False):
         if refresh or self.series is None:
-            series = imdbf.get_series_with_entries(title_id, refresh)
+            series = imdbf.get_series_with_entries(title_id, refresh = refresh)
             if 'unknown' in series.seasons:
                 series.seasons[0] = series.seasons['unknown']
                 del series.seasons['unknown']
             return series
-        elif title_id != series.title_id:
-            return self.get_series(title_id, refresh = True)
+        elif title_id != self.series.title_id:
+            self.series = None
+            return self.get_series(title_id, refresh = False)
         else:
             return self.series
 
@@ -518,11 +579,13 @@ class TvTracker(tk.Frame):
 
     @log_class
     def _click_refresh(self, event = None):
-        pass
+        self.update_table()
 
     @log_class
     def _click_download(self, event = None):
-        pass
+        title = self.get_series(self.title_id, refresh = True)
+        title.get_episodes(basic_only = True)
+        # for season_number, season in title.se
 
     @log_class
     def _click_search(self, event = None):
@@ -538,9 +601,10 @@ class TvTracker(tk.Frame):
     @log_class
     def _series_select(self, event = None):
         series_id = self.series_list.get()
-        self.series_list.destroy()
         self.title_id = series_id
+        self.series_list.destroy()
         self.update_table()
+        self.event_generate("<<SeriesChange>>")
 
     @log_class
     def get_series_list(self) -> dict:
@@ -551,10 +615,13 @@ class TvTracker(tk.Frame):
         result_dict = {title_id: title for title_id, title in result}
         return result_dict
 
-
     @log_class
     def _click_random(self, event = None):
-        pass
+        series = self.get_series_list()
+        series_id = random.choice(list(series))
+        self.title_id = series_id
+        self.update_table()
+        self.event_generate("<<SeriesChange>>")
 
     @log_class
     def _click_further_details(self, event = None):
@@ -596,5 +663,19 @@ if __name__ == "__main__":
         "SeriesList.Treeview", font = ('Calibri', 12),
         padding = 5, rowheight = 20
         )
+    style.layout(
+            'PolygonProgress.Horizontal.TProgressbar',
+            [('Horizontal.Progressbar.trough',
+              {'children': [('Horizontal.Progressbar.pbar',
+                             {'side': 'left', 'sticky': 'ns'})],
+               'sticky': 'nswe'}),
+             ('Horizontal.Progressbar.label', {'sticky': ''})])
+    style.configure(
+            "PolygonProgress.Horizontal.TProgressbar",
+            foreground = "black", background = "midnight blue",
+            bordercolor = "midnight blue", lightcolor = "midnight blue",
+            darkcolor = "midnight blue", text = '0%',
+            font = ('Calibri', 15, 'bold')
+            )
 
     root.mainloop()
