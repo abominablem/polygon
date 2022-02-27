@@ -114,23 +114,25 @@ class Title:
             self.plot_tag = f.list_default(plot, 0, "").strip()
 
     @log_class
-    def get_episodes(self):
+    def get_episodes(self, basic_only = False):
         if not self.type in c.TV_TYPES:
             raise WrongTitleTypeError(self.type)
 
         if hasattr(self, "_title"):
             imdb.update(self._title, "episodes")
 
-        # Create dictionary of Title object for each season/episode
-        self.episodes = {}
-        for season in self._data_get("episodes", {}):
-            self.episodes[season] = {}
-            for episode in self._data["episodes"][season]:
-                movie = self._data["episodes"][season][episode]
-                title = Title()
-                title.from_object(movie)
-                self.episodes[season][episode] = title
-        return self.episodes
+        if not basic_only:
+            # Create dictionary of Title object for each season/episode
+            self.episodes = {}
+            for season in self._data_get("episodes", {}):
+                self.episodes[season] = {}
+                for episode in self._data["episodes"][season]:
+                    movie = self._data["episodes"][season][episode]
+                    title = Title()
+                    title.from_object(movie)
+                    self.episodes[season][episode] = title
+            return self.episodes
+        return self._data_get("episodes", {})
 
     @log_class
     def clear(self):
@@ -565,14 +567,14 @@ class IMDbFunctions:
 
     @log_class
     def get_series_with_entries(self, title_id, refresh):
-        series = self.get_series(title_id, get_episodes = True, refresh = refresh)
+        series = self.get_series(title_id, refresh = refresh, get_episodes = True)
         for episode in series.episodes:
             episode.entry = Entry(episode.title_id)
         return series
 
     @log_class
-    def get_series(self, title_id, get_episodes = True, refresh = False):
-        series = self.get_title(title_id, refresh)
+    def get_series(self, title_id, refresh = False, get_episodes = True):
+        series = self.get_title(title_id, refresh = refresh)
         if get_episodes:
             series.episodes = self.get_episodes(title_id, refresh)
             seasons = {episode.season for episode in series.episodes}
@@ -611,6 +613,7 @@ class IMDbBaseTitleFunctions:
     @log_class
     def exists_id(self, title_id):
         """ Return if title_id exists in database """
+        title_id = standardise_id(title_id)
         result = self.db.filter({"title_id": title_id}, "title_id")
         return len(result["title_id"]) != 0
 
