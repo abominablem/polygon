@@ -45,7 +45,7 @@ class SeasonCounter(tk.Frame):
 
         self._pixel = tk.PhotoImage(width = 1, height = 1)
         self.font_count_size = 30
-        self.font_count = ("Calibri", self.font_count_size)
+        self.font_count = ("Calibri", self.font_count_size, "bold")
 
         self.counter = tk.Label(
             self.counter_frame.inner, text = "Season 1",
@@ -111,7 +111,7 @@ class CompletionTracker(base.TrimmedFrame):
         columns = {
             1: {"header": "", "width": 1,
                 "stretch": False, "anchor": "center"},
-            2: {"header": "Season", "width": 110,
+            2: {"header": "Season", "width": 60,
                 "stretch": True, "anchor": "center"},
             3: {"header": "#", "width": 40,
                 "stretch": True, "anchor": "center"},
@@ -164,17 +164,19 @@ class EpisodeTable(base.TrimmedFrame):
         super().__init__(master, **kwargs)
 
         columns = {
-            1: {"header": "#", "width": 70,
+            1: {"header": "", "width": 1,
                 "stretch": False, "anchor": "center"},
-            2: {"header": "Episode name", "width": 600,
+            2: {"header": "#", "width": 70,
+                "stretch": False, "anchor": "center"},
+            3: {"header": "Episode name", "width": 600,
                 "stretch": True, "anchor": "w"},
-            3: {"header": "Watched?", "width": 200,
+            4: {"header": "Watched?", "width": 200,
                 "stretch": False, "anchor": "center"},
-            4: {"header": "Date watched", "width": 220,
+            5: {"header": "Date watched", "width": 220,
                 "stretch": False, "anchor": "center"},
-            5: {"header": "Rating", "width": 150,
+            6: {"header": "Rating", "width": 150,
                 "stretch": False, "anchor": "center"},
-            6: {"header": "Runtime", "width": 150,
+            7: {"header": "Runtime", "width": 150,
                 "stretch": False, "anchor": "center"},
             }
         self.table = dw.SimpleTreeview(
@@ -206,7 +208,8 @@ class EpisodeTable(base.TrimmedFrame):
             if title.title_id in children:
                 continue
             self.table.insert("", index = "end", iid = title.title_id,
-                              text = title.episode, values = values)
+                              text = "", values = values)
+
     @log_class
     def get_values(self, title):
         if title.entry.watched:
@@ -214,13 +217,161 @@ class EpisodeTable(base.TrimmedFrame):
                     else datetime.strptime(
                         title.entry.date, "%Y-%m-%d").strftime("%d/%m/%Y"))
             rating = "" if title.entry.rating is None else title.entry.rating
-            return (title.title, "Yes", date, rating, title.runtime)
+            return (title.episode, title.title, "Yes", date, rating,
+                    title.runtime)
         else:
-            return (title.title, "No", "", "", title.runtime)
+            return (title.episode, title.title, "No", "", "", title.runtime)
 
     @log_class
     def clear(self):
         self.table.clear()
+
+
+class DownloadData(tk.Toplevel):
+    @log_class
+    def __init__(self, master, *args, **kwargs):
+        super().__init__(master, *args, **kwargs)
+
+        self.frame = base.TrimmedFrame(self, bg = c.COLOUR_TV_BACKGROUND)
+        self.frame.inner.config(bg = c.COLOUR_TV_BACKGROUND, width = 900)
+        self.frame.grid(row = 0, column = 0, **c.GRID_STICKY)
+        self.rowconfigure(0, weight = 1)
+        self.columnconfigure(0, weight = 1)
+
+        font_btn = ("Calibri", 20, "bold")
+        btn_width = 180
+        self.btn_select_existing = PolygonButton(
+            self.frame.inner, text = "Update existing",
+            command = self._select_existing, font = font_btn, width = btn_width
+            )
+        self.btn_select_new = PolygonButton(
+            self.frame.inner, text = "Import new",
+            command = self._select_new, font = font_btn, width = btn_width
+            )
+        self.btn_import = PolygonButton(
+            self.frame.inner, text = "Import",
+            command = self._import, font = font_btn, width = btn_width
+            )
+
+        columns = {
+            1: {"header": "", "width": 1,
+                "stretch": False, "anchor": "center"},
+            2: {"header": "", "width": 50,
+                "stretch": False, "anchor": "center"},
+            3: {"header": "Season", "width": 60,
+                "stretch": True, "anchor": "center"},
+            4: {"header": "Episode", "width": 60,
+                "stretch": True, "anchor": "center"},
+            5: {"header": "Episode name", "width": 300,
+                "stretch": True, "anchor": "w"},
+            6: {"header": "Release date", "width": 100,
+                "stretch": True, "anchor": "center"},
+            7: {"header": "Watch date", "width": 100,
+                "stretch": True, "anchor": "center"},
+            8: {"header": "New episode?", "width": 120,
+                "stretch": True, "anchor": "center"},
+            9: {"header": "Last refreshed", "width": 120,
+                "stretch": True, "anchor": "center"},
+            }
+        tv_width = sum([cdict.get('width', 0) for cdict in columns.values()])
+        self.table = dw.SimpleTreeview(
+            self.frame.inner, columns, style = "DownloadData.Treeview",
+            edit = False
+            )
+        self.table.bind("<<TreeviewSelect>>", self._set_selected)
+
+        btn_kwargs = {**c.GRID_STICKY, 'padx': 5, 'pady': 5}
+        widgets = {
+            1: {'widget': self.btn_select_existing, 'grid_kwargs': btn_kwargs,
+                'stretch_height': False},
+            2: {'widget': self.btn_select_new, 'grid_kwargs': btn_kwargs},
+            3: {'widget': self.btn_import, 'grid_kwargs': btn_kwargs},
+            4: {'widget': self.table, 'grid_kwargs': c.GRID_STICKY,
+                'stretch_width': True, 'stretch_height': True},
+            -1: {'widget_kwargs': {'bg': c.COLOUR_FILM_BACKGROUND,
+                                    'fg': c.COLOUR_FILM_BACKGROUND},
+                  'stretch_height': True}
+            }
+        self.widget_set = tka.WidgetSet(
+            self.frame.inner, widgets,
+            layout = [[4, 1], [4, 2], [4, -1], [4, 3]]
+            )
+        self.frame.rowconfigure(0, weight = 1)
+        self.frame.columnconfigure(0, weight = 1)
+        self.widget_set.grid(row = 0, column = 0, **c.GRID_STICKY)
+
+    @log_class
+    def _set_selected(self, *args):
+        selection = self.table.selection()
+        for item in self.table.get_children():
+            if item in selection:
+                self.table.set(item, '#1', "🗹")
+            else:
+                self.table.set(item, '#1', "☐")
+
+    @log_class
+    def _select_existing(self, *args):
+        pass
+
+    @log_class
+    def _select_new(self, *args):
+        pass
+
+    @log_class
+    def _import(self, *args):
+        pass
+
+    @log_class
+    def add_episodes(self, titles):
+        self.table.clear()
+        if not isinstance(titles, list):
+            titles = [titles]
+
+        for title in titles:
+            values = self.get_values(title)
+            self.table.insert("", index = "end", iid = title.title_id,
+                              text = "", values = values)
+
+    @log_class
+    def get_values(self, title):
+        query = f""" SELECT e.entry_date, t.import_date FROM titles t
+                    LEFT JOIN (SELECT * FROM entries e
+                               WHERE title_id = '{title.title_id}'
+                                   AND rewatch = 'False') e
+                    ON t.title_id = e.title_id
+                    WHERE t.title_id = '{title.title_id}'
+                    """
+        result = base.polygon_db.titles.select(query)
+        if len(result) == 0:
+            new_episode = "Yes"; entry_date = ""; import_date = ""
+        else:
+            new_episode = "No"
+            entry_date = self.format_time(result[0][0])
+            import_date = self.format_time(result[0][1])
+
+        return ("☐", title.season, title.episode, title.title,
+                self.format_time(title.release_date), entry_date, new_episode,
+                self.format_time(import_date))
+
+    @log_class
+    def format_time(self, time: str) -> str:
+        if time is None:
+            return ""
+        time = time[:10]
+        try:
+            return datetime.strptime(time, "%Y-%m-%d").strftime("%d/%m/%Y")
+        except:
+            return time
+
+    @log_class
+    def start(self):
+        self.window.eval(f'tk::PlaceWindow {self} center')
+        # self.overrideredirect(True)
+        # self.transient(self.master)
+        self.grab_set()
+        self.lift()
+        self.mainloop()
+
 
 class TvTracker(tk.Frame):
     @log_class
@@ -285,7 +436,7 @@ class TvTracker(tk.Frame):
             )
         self.btn_download = PolygonButton(
             self.widget_frame, text = "", command = self._click_download,
-            width = 130, anchor = "center", font = ("Calibri", 30),
+            width = 130, anchor = "center", font = ("Calibri", 30, "bold"),
             )
         self.btn_search = PolygonButton(
             self.widget_frame, text = "🔎", command = self._click_search,
@@ -293,7 +444,7 @@ class TvTracker(tk.Frame):
             )
         self.btn_random = PolygonButton(
             self.widget_frame, text = "", command = self._click_random,
-            width = 130, anchor = "center", font = ("Calibri", 30),
+            width = 130, anchor = "center", font = ("Calibri", 30, "bold"),
             )
         self.btn_further_details = PolygonButton(
             self.widget_frame, text = "xx",
@@ -396,9 +547,9 @@ class TvTracker(tk.Frame):
 
         for season in seasons:
             for episode in seasons[season]:
-                movie = seasons[season][episode]
+                title = seasons[season][episode]
                 try:
-                    imdbf.add_title(movie.getID())
+                    imdbf.add_title(title.title_id)
                 except imdb_functions.EpisodeExistsError:
                     pass
                 self.progress_bar.step(1)
@@ -421,8 +572,7 @@ class TvTracker(tk.Frame):
         elif title.type in c.EPISODE_TYPES:
             self.title_id = title.series_id
             season, episode = self.get_title_season_episode(title_id)
-            self.season_display.set(season, suppress_event = True)
-            self.update_table()
+            self.season_display.set(season)
 
             # dim the window in the background for better contrast
             self.dim(transparency = 0.7)
@@ -502,6 +652,7 @@ class TvTracker(tk.Frame):
     def _series_change(self, event):
         season = self.get_first_incomplete_season(self.title_id)
         self.season_display.set(season)
+        self.update_table()
 
     @log_class
     def update_table(self, event = None, refresh = False, *args, **kwargs):
@@ -570,22 +721,37 @@ class TvTracker(tk.Frame):
             return int(result)
 
     @log_class
+    def clear_selected_episodes(self, event = None):
+        for item in self.episode_table.table.selection():
+           self.episode_table.table.selection_remove(item)
+
+    @log_class
     def _click_save(self, event = None):
-        pass
+        """ Save all changes made """
+        self.clear_selected_episodes()
 
     @log_class
     def _click_discard(self, event = None):
-        pass
+        """ Discard all changes made since last saving """
+        self.update_table()
+        self.clear_selected_episodes()
 
     @log_class
     def _click_refresh(self, event = None):
+        """ Repull data from the database """
+        self.series = self.get_series_db()
         self.update_table()
+        self.clear_selected_episodes()
 
     @log_class
     def _click_download(self, event = None):
-        title = self.get_series(self.title_id, refresh = True)
-        title.get_episodes(basic_only = True)
-        # for season_number, season in title.se
+        title = imdbf.get_title(self.title_id, get_episodes = False,
+                                refresh = True)
+        seasons = title.get_episodes(basic_only = True)
+        episodes = [episode for season in seasons.values()
+                    for episode in season.values()]
+        self.download_window = DownloadData(self, bg = c.COLOUR_TV_BACKGROUND)
+        self.download_window.add_episodes(episodes)
 
     @log_class
     def _click_search(self, event = None):
@@ -663,6 +829,22 @@ if __name__ == "__main__":
         "SeriesList.Treeview", font = ('Calibri', 12),
         padding = 5, rowheight = 20
         )
+
+
+    style.configure(
+        "DownloadData.Treeview", fieldbackground="white",
+        font = ('Calibri', 20), rowheight = 40, relief = 'flat'
+        )
+    style.map(
+        'DownloadData.Treeview', background=[('selected', 'midnight blue')],
+        foreground=[('selected', 'white')]
+        )
+    style.configure(
+        "DownloadData.Treeview.Heading", font = ('Calibri', 20,'bold'),
+        padding = 5, rowheight = 60
+        )
+
+
     style.layout(
             'PolygonProgress.Horizontal.TProgressbar',
             [('Horizontal.Progressbar.trough',
