@@ -53,15 +53,16 @@ class Title:
             self.__dict__.update(detail)
 
     @log_class
-    def from_object(self, movie):
+    def from_object(self, movie, update = True):
         """ Create Title object from imdb.Movie.Movie object """
-        self._data_from_object(movie)
+        self._data_from_object(movie, update = update)
 
     @log_class
-    def _data_from_object(self, movie):
+    def _data_from_object(self, movie, update = True):
         self.title_id = standardise_id(movie.getID())
 
-        imdb.update(movie, ["akas", "main"])
+        if update:
+            imdb.update(movie, ["akas", "main"])
 
         self._title = movie
         self._data = self._title.data
@@ -118,21 +119,28 @@ class Title:
         if not self.type in c.TV_TYPES:
             raise WrongTitleTypeError(self.type)
 
-        if hasattr(self, "_title"):
-            imdb.update(self._title, "episodes")
+        try:
+            self.update("episodes")
+        except AttributeError:
+            pass
 
-        if not basic_only:
-            # Create dictionary of Title object for each season/episode
-            self.episodes = {}
-            for season in self._data_get("episodes", {}):
-                self.episodes[season] = {}
-                for episode in self._data["episodes"][season]:
-                    movie = self._data["episodes"][season][episode]
-                    title = Title()
-                    title.from_object(movie)
-                    self.episodes[season][episode] = title
-            return self.episodes
-        return self._data_get("episodes", {})
+        # Create dictionary of Title object for each season/episode
+        self.episodes = {}
+        for season in self._data_get("episodes", {}):
+            self.episodes[season] = {}
+            for episode in self._data["episodes"][season]:
+                movie = self._data["episodes"][season][episode]
+                title = Title()
+                title.from_object(movie, update = not basic_only)
+                self.episodes[season][episode] = title
+        return self.episodes
+
+    @log_class
+    def update(self, type):
+        if hasattr(self, "_title"):
+            imdb.update(self._title, type)
+        else:
+            raise AttributeError("Title has no _title imdb.Movie attribute")
 
     @log_class
     def clear(self):
@@ -254,6 +262,7 @@ class Title:
         else:
             return original_title
 
+    @log_class
     def _get_original_title(self, year):
         """ Get the original title, based on the akas and release year """
         akas = self._data_get("akas", [])
@@ -272,7 +281,6 @@ class Title:
         names = [person.data['name'] for person in people]
         return names
 
-    @log_class
     def __str__(self):
         try:
             if self.type == "episode":
