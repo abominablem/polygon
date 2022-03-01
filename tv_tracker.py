@@ -226,14 +226,15 @@ class EpisodeTable(base.TrimmedFrame):
     def clear(self):
         self.table.clear()
 
-
 class DownloadData(tk.Toplevel):
     @log_class
     def __init__(self, master, *args, **kwargs):
         super().__init__(master, *args, **kwargs)
+        self.window = futil.get_tk(self)
 
+        self._pixel = tk.PhotoImage(width = 1, height = 1)
         self.frame = base.TrimmedFrame(self, bg = c.COLOUR_TV_BACKGROUND)
-        self.frame.inner.config(bg = c.COLOUR_TV_BACKGROUND, width = 900)
+        self.frame.inner.config(bg = c.COLOUR_TV_BACKGROUND)
         self.frame.grid(row = 0, column = 0, **c.GRID_STICKY)
         self.rowconfigure(0, weight = 1)
         self.columnconfigure(0, weight = 1)
@@ -253,32 +254,52 @@ class DownloadData(tk.Toplevel):
             command = self._import, font = font_btn, width = btn_width
             )
 
+        check_font = ("Calibri", 20)
+        self.checks = {'Episode name': None,
+                       'Release date': None,
+                       'Runtime': None,
+                       'IMDb user rating': None,
+                       'IMDb user votes': None,}
+        self.check_values = {check: True for check in self.checks}
+
+        for check in self.checks:
+            self.checks[check] = tk.Checkbutton(
+                self.frame.inner, font = check_font, width = btn_width,
+                image = self._pixel, bg = c.COLOUR_TV_BACKGROUND,
+                text = check, anchor = "w", foreground = "white",
+                justify = "left", cursor = "hand2", activeforeground = "black",
+                selectcolor = "black", compound = "left", onvalue = True,
+                offvalue = False, activebackground = c.COLOUR_OFFWHITE_TEXT,
+                )
+            self.checks[check].bind("<1>", self.toggle_check)
+            self.checks[check].select()
+
         columns = {
             1: {"header": "", "width": 1,
                 "stretch": False, "anchor": "center"},
             2: {"header": "", "width": 50,
                 "stretch": False, "anchor": "center"},
-            3: {"header": "Season", "width": 60,
+            3: {"header": "Season", "width": 120,
                 "stretch": True, "anchor": "center"},
-            4: {"header": "Episode", "width": 60,
+            4: {"header": "Episode", "width": 120,
                 "stretch": True, "anchor": "center"},
-            5: {"header": "Episode name", "width": 300,
+            5: {"header": "Episode name", "width": 400,
                 "stretch": True, "anchor": "w"},
-            6: {"header": "Release date", "width": 100,
+            6: {"header": "Release date", "width": 180,
                 "stretch": True, "anchor": "center"},
-            7: {"header": "Watch date", "width": 100,
+            7: {"header": "Watch date", "width": 180,
                 "stretch": True, "anchor": "center"},
-            8: {"header": "New episode?", "width": 120,
+            8: {"header": "New episode?", "width": 180,
                 "stretch": True, "anchor": "center"},
-            9: {"header": "Last refreshed", "width": 120,
+            9: {"header": "Last refreshed", "width": 180,
                 "stretch": True, "anchor": "center"},
             }
-        tv_width = sum([cdict.get('width', 0) for cdict in columns.values()])
         self.table = dw.SimpleTreeview(
             self.frame.inner, columns, style = "DownloadData.Treeview",
             edit = False
             )
         self.table.bind("<<TreeviewSelect>>", self._set_selected)
+        self.bind("<Escape>", lambda event: self.destroy)
 
         btn_kwargs = {**c.GRID_STICKY, 'padx': 5, 'pady': 5}
         widgets = {
@@ -288,17 +309,25 @@ class DownloadData(tk.Toplevel):
             3: {'widget': self.btn_import, 'grid_kwargs': btn_kwargs},
             4: {'widget': self.table, 'grid_kwargs': c.GRID_STICKY,
                 'stretch_width': True, 'stretch_height': True},
+            **{key + 5: {'widget': widget, 'grid_kwargs': btn_kwargs}
+               for key, widget in enumerate(self.checks.values())},
             -1: {'widget_kwargs': {'bg': c.COLOUR_FILM_BACKGROUND,
                                     'fg': c.COLOUR_FILM_BACKGROUND},
                   'stretch_height': True}
             }
         self.widget_set = tka.WidgetSet(
             self.frame.inner, widgets,
-            layout = [[4, 1], [4, 2], [4, -1], [4, 3]]
+            layout = [[4, 1], [4, 2], [4, 5], [4, 6], [4, 7], [4, 8], [4, 9],
+                      [4, -1], [4, 3]]
             )
         self.frame.rowconfigure(0, weight = 1)
         self.frame.columnconfigure(0, weight = 1)
         self.widget_set.grid(row = 0, column = 0, **c.GRID_STICKY)
+
+    @log_class
+    def toggle_check(self, event = None):
+        check = event.widget.cget('text')
+        self.check_values[check] = not self.check_values[check]
 
     @log_class
     def _set_selected(self, *args):
@@ -311,11 +340,21 @@ class DownloadData(tk.Toplevel):
 
     @log_class
     def _select_existing(self, *args):
-        pass
+        selection = []
+        self.table.selection_clear()
+        for item in self.table.get_children():
+            if self.table.set(item, "New episode?") == "No":
+                selection.append(item)
+        self.table.selection_set(*selection)
 
     @log_class
     def _select_new(self, *args):
-        pass
+        selection = []
+        self.table.selection_clear()
+        for item in self.table.get_children():
+            if self.table.set(item, "New episode?") == "Yes":
+                selection.append(item)
+        self.table.selection_set(*selection)
 
     @log_class
     def _import(self, *args):
@@ -367,7 +406,7 @@ class DownloadData(tk.Toplevel):
     def start(self):
         self.window.eval(f'tk::PlaceWindow {self} center')
         # self.overrideredirect(True)
-        # self.transient(self.master)
+        self.transient(self.master)
         self.grab_set()
         self.lift()
         self.mainloop()
@@ -752,6 +791,7 @@ class TvTracker(tk.Frame):
                     for episode in season.values()]
         self.download_window = DownloadData(self, bg = c.COLOUR_TV_BACKGROUND)
         self.download_window.add_episodes(episodes)
+        self.download_window.start()
 
     @log_class
     def _click_search(self, event = None):
