@@ -10,6 +10,7 @@ import tkinter as tk
 from tkinter import ttk
 from datetime import datetime
 import random
+from PIL import Image, ImageTk
 
 from mh_logging import log_class
 import tk_arrange as tka
@@ -19,6 +20,7 @@ import base
 import futil
 from imdb_functions import imdbf
 import imdb_functions
+import log_entry_tag as tagf
 from widgets import (RequestTitleWindow, PolygonButton, OptionList,
                      PolygonProgressBar)
 from log_entry import LogEntryWindow
@@ -231,6 +233,7 @@ class DownloadData(tk.Toplevel):
     def __init__(self, master, *args, **kwargs):
         super().__init__(master, *args, **kwargs)
         self.window = futil.get_tk(self)
+        self.wm_attributes("-transparentcolor", c.COLOUR_TRANSPARENT)
 
         self._pixel = tk.PhotoImage(width = 1, height = 1)
         self.frame = base.TrimmedFrame(self, bg = c.COLOUR_TV_BACKGROUND)
@@ -322,7 +325,41 @@ class DownloadData(tk.Toplevel):
             )
         self.frame.rowconfigure(0, weight = 1)
         self.frame.columnconfigure(0, weight = 1)
-        self.widget_set.grid(row = 0, column = 0, **c.GRID_STICKY)
+        self.widget_set.grid(row = 0, column = 0, rowspan = 2, **c.GRID_STICKY)
+
+        """ Closing X image """
+        self.x_image = {
+            "standard": ImageTk.PhotoImage(
+                tagf.x_image(height = 100, colour = "black")
+                ),
+            "hover": ImageTk.PhotoImage(
+                tagf.x_image(height = 100, colour = "gray")
+                )
+            }
+        self.x_label = tk.Label(
+            self, bg = c.COLOUR_TRANSPARENT,
+            image = self.x_image["standard"], anchor = "n", cursor = "hand2"
+            )
+        self.x_label.bind("<Enter>", self._enter_x)
+        self.x_label.bind("<Leave>", self._leave_x)
+        self.x_label.bind("<1>", self._click_x)
+        self.x_padding = tk.Label(self, bg = c.COLOUR_TRANSPARENT)
+
+        self.x_label.grid(row = 0, column = 1, **c.GRID_STICKY)
+        self.x_padding.grid(row = 1, column = 1, **c.GRID_STICKY)
+
+    @log_class
+    def _enter_x(self, *args):
+        self.x_label.config(image = self.x_image["hover"])
+
+    @log_class
+    def _leave_x(self, *args):
+        self.x_label.config(image = self.x_image["standard"])
+
+    @log_class
+    def _click_x(self, *args):
+        self.master.focus_force()
+        self.destroy()
 
     @log_class
     def toggle_check(self, event = None):
@@ -405,7 +442,7 @@ class DownloadData(tk.Toplevel):
     @log_class
     def start(self):
         self.window.eval(f'tk::PlaceWindow {self} center')
-        # self.overrideredirect(True)
+        self.overrideredirect(True)
         self.transient(self.master)
         self.grab_set()
         self.lift()
