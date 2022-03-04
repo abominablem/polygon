@@ -40,7 +40,7 @@ class FilmTracker(tk.Frame):
             height = c.DM_FILM_HEADER_HEIGHT
             )
         self.padding_left = Padding(
-            self.header_frame, width = 150, height = c.DM_FILM_HEADER_HEIGHT
+            self.header_frame, height = c.DM_FILM_HEADER_HEIGHT
             )
 
         self.btn_add_new = PolygonButton(
@@ -60,7 +60,7 @@ class FilmTracker(tk.Frame):
             )
 
         self.padding_middle = Padding(
-            self.header_frame, width = 150, height = c.DM_FILM_HEADER_HEIGHT
+            self.header_frame, height = c.DM_FILM_HEADER_HEIGHT
             )
 
         self.last_range_change = datetime.min
