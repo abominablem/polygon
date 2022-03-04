@@ -322,6 +322,9 @@ class Title:
 
     __repr__ = __str__
 
+    def __getitem__(self, arg):
+        return self.__dict__[arg]
+
 class TitleExistsError(base.PolygonException):
     """ Raised when title already exists in database """
     def __init__(self):
