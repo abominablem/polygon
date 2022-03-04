@@ -10,7 +10,7 @@ import tkinter as tk
 from tkinter import ttk
 from datetime import datetime
 import random
-from PIL import Image, ImageTk
+from PIL import ImageTk
 
 from mh_logging import log_class
 import tk_arrange as tka
@@ -26,11 +26,6 @@ from widgets import (RequestTitleWindow, PolygonButton, OptionList,
 from log_entry import LogEntryWindow
 
 log_class = log_class(c.LOG_LEVEL)
-
-class RequestTVWindow:
-    @log_class
-    def __init__(self):
-        pass
 
 class SeasonCounter(tk.Frame):
     @log_class
@@ -258,10 +253,8 @@ class DownloadData(tk.Toplevel):
             )
 
         check_font = ("Calibri", 20)
-        self.checks = {'Episode name': None,
-                       'Release date': None,
-                       'Runtime': None,
-                       'IMDb user rating': None,
+        self.checks = {'Episode name': None, 'Release date': None,
+                       'Runtime': None, 'IMDb user rating': None,
                        'IMDb user votes': None,}
         self.check_values = {check: True for check in self.checks}
 
@@ -395,7 +388,19 @@ class DownloadData(tk.Toplevel):
 
     @log_class
     def _import(self, *args):
-        pass
+        attr_map = {
+            'Episode name': "title", 'Release date': "release_date",
+            'Runtime': "runtime", 'IMDb user rating': "imdb_user_rating",
+            'IMDb user votes': "imdb_user_votes"
+            }
+        attr_list = [attr_map[attr] for attr in attr_map
+                     if self.check_values[attr]]
+
+        for title_id in self.table.selection():
+            title = imdbf.get_title(title_id, refresh = True)
+            values = {attr: title[attr] for attr in attr_list}
+            base.polygon_db.titles.update(
+                filters = {"title_id": title_id}, **values)
 
     @log_class
     def add_episodes(self, titles):
@@ -442,6 +447,7 @@ class DownloadData(tk.Toplevel):
     @log_class
     def start(self):
         self.window.eval(f'tk::PlaceWindow {self} center')
+        self.attributes('-topmost', True)
         self.overrideredirect(True)
         self.transient(self.master)
         self.grab_set()
@@ -638,6 +644,7 @@ class TvTracker(tk.Frame):
 
     @log_class
     def log_entry(self, title_id):
+        """ Open a log entry window for the given title_id """
         # get the title object for this id
         title = imdbf.get_title(title_id, get_episodes = False,
                                 refresh = False)
@@ -732,6 +739,7 @@ class TvTracker(tk.Frame):
 
     @log_class
     def update_table(self, event = None, refresh = False, *args, **kwargs):
+        """ Update the episode table for any changes in season/series/data """
         self.episode_table.clear()
         title_id = self.title_id
 
@@ -753,6 +761,7 @@ class TvTracker(tk.Frame):
 
     @log_class
     def get_series_db(self):
+        """ Refresh the series data from the database """
         self.series = None
         return self.get_series(self.title_id)
 
@@ -798,6 +807,7 @@ class TvTracker(tk.Frame):
 
     @log_class
     def clear_selected_episodes(self, event = None):
+        """ Clear the episode table treeview """
         for item in self.episode_table.table.selection():
            self.episode_table.table.selection_remove(item)
 
@@ -821,17 +831,19 @@ class TvTracker(tk.Frame):
 
     @log_class
     def _click_download(self, event = None):
+        """ Called from download button """
         title = imdbf.get_title(self.title_id, get_episodes = False,
                                 refresh = True)
         seasons = title.get_episodes(basic_only = True)
         episodes = [episode for season in seasons.values()
                     for episode in season.values()]
-        self.download_window = DownloadData(self, bg = c.COLOUR_TV_BACKGROUND)
+        self.download_window = DownloadData(self, bg = c.COLOUR_TRANSPARENT)
         self.download_window.add_episodes(episodes)
         self.download_window.start()
 
     @log_class
     def _click_search(self, event = None):
+        """ Called from search button """
         series_dict = self.get_series_list()
         self.series_list = OptionList(
             self, style = "SeriesList.Treeview", width = 350, height = 700,
