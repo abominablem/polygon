@@ -167,7 +167,7 @@ class RatingDisplay(tk.Text):
 
     @log_class
     def get_mouseover_rating(self, event):
-        x, y = event.x, event.y
+        x = event.x
         text_width = self._get_current_width()
         widget_width = self.winfo_width()
         x_offset = int((widget_width - text_width)/2)
