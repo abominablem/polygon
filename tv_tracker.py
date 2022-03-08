@@ -124,18 +124,19 @@ class CompletionTracker(base.TrimmedFrame):
 
     @log_class
     def update(self, series):
+        """ Update tracker with a series Tite object """
         self.table.clear()
         for number, season in series.seasons.items():
             self.table.insert(
                 "", "end", iid = number, text = "", values = (
-                    number,
-                    len(season),
+                    number, len(season),
                     self.get_season_completion(season, "percentage")
                     )
                 )
 
     @log_class
     def get_season_completion(self, season, type = "percentage"):
+        """ Get string for completion of a given season """
         ep_count = len(season)
         watch_count = len([episode for episode in season
                            if episode.entry.watched])
@@ -146,14 +147,6 @@ class CompletionTracker(base.TrimmedFrame):
             return f"{watch_count}/{ep_count}"
         else:
             raise ValueError("Invalid completion type")
-
-class WatchEntry:
-    @log_class
-    def __init__(self, date = None, rating = None):
-        self.date = date
-        self.rating = rating
-        self.watched = not date is None
-        self.watched_string = "Yes" if self.watched else "No"
 
 class EpisodeTable(base.TrimmedFrame):
     @log_class
@@ -503,6 +496,8 @@ class TvTracker(tk.Frame):
 
         self.episode_table = EpisodeTable(self.widget_frame)
         self.episode_table.table.bind("<Double-1>", self._double_episode_row)
+        self.episode_table.table.bind("<<EditValue>>", self.log_edit)
+        self.logged_edits = {}
 
         self.btn_save = PolygonButton(
             self.widget_frame, text = "💾", command = self._click_save,
@@ -537,6 +532,8 @@ class TvTracker(tk.Frame):
         self.completion_tracker = CompletionTracker(
             self.widget_frame, width = 240
             )
+        self.completion_tracker.table.bind(
+            "<Double-1>", self._double_click_completion)
 
         widgets = {
             1: {'widget': self.episode_table,
@@ -738,6 +735,19 @@ class TvTracker(tk.Frame):
         self.update_table()
 
     @log_class
+    def log_edit(self, event):
+        edict = self.episode_table.table.events["<<EditValue>>"]
+        col_name = self.episode_table.table.translate_column(
+            edict["column"], to_id = False)
+        col = {"Episode name": "custom_title", "Runtime": "runtime"}[col_name]
+        self._log_edit(edict["row"], **{col: edict["cell"]})
+
+    @log_class
+    def _log_edit(self, title_id, **kwargs):
+        self.logged_edits.setdefault(title_id, {})
+        self.logged_edits[title_id].update(kwargs)
+
+    @log_class
     def update_table(self, event = None, refresh = False, *args, **kwargs):
         """ Update the episode table for any changes in season/series/data """
         self.episode_table.clear()
@@ -810,6 +820,11 @@ class TvTracker(tk.Frame):
         """ Clear the episode table treeview """
         for item in self.episode_table.table.selection():
            self.episode_table.table.selection_remove(item)
+
+    @log_class
+    def _double_click_completion(self, event = None):
+        season = self.completion_tracker.table.events["<Double-1>"]["row"]
+        self.season_display.set(int(season))
 
     @log_class
     def _click_save(self, event = None):
