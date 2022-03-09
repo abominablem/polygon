@@ -35,19 +35,13 @@ class PolygonFrameBase:
                     )
                 )
         self.title = tk.Label(
-            self.widget_frame,
-            text = title,
-            background = c.COLOUR_TITLEBAR,
-            foreground = c.COLOUR_OFFWHITE_TEXT,
-            padx = 20,
+            self.widget_frame, text = title, background = c.COLOUR_TITLEBAR,
+            foreground = c.COLOUR_OFFWHITE_TEXT, padx = 20, anchor = "w",
             font = c.FONT_MAIN_TITLE,
-            anchor = "w",
             )
         self.logo = tk.Label(
-            self.widget_frame,
-            image = self.img_logo_padded,
-            background = c.COLOUR_TITLEBAR,
-            anchor = "w", padx = 20,
+            self.widget_frame, image = self.img_logo_padded,
+            background = c.COLOUR_TITLEBAR, anchor = "w", padx = 20,
             )
 
         widgets = {1: {'widget': self.logo,
@@ -77,19 +71,104 @@ class PolygonFrameBase:
     def columnconfigure(self, *args, **kwargs):
         self.widget_set.columnconfigure(*args, **kwargs)
 
-class PolygonWindowBase:
+class PolygonWindowBase(tk.Toplevel):
     """ Toplevel window with OctaveFrameBase """
     @log_class
-    def __init__(self, master, title = "Octave"):
-        self.master = master
-        self.window = tk.Toplevel(self.master, bg = c.COLOUR_BACKGROUND)
-        self.master.eval(f'tk::PlaceWindow {self.window} center')
-        self.title_bar = PolygonFrameBase(self.window, title = title)
+    def __init__(self, master, title = "Octave", **kwargs):
+        super().__init__(master, bg = c.COLOUR_BACKGROUND, **kwargs)
+        self.master.eval(f'tk::PlaceWindow {self} center')
+        self.title_bar = PolygonFrameBase(self, title = title)
 
     @log_class
     def start(self):
-        self.window.grab_set()
-        self.window.mainloop()
+        self.grab_set()
+        self.mainloop()
+
+class IconSet(tk.Frame):
+    @log_class
+    def __init__(self, *args, **kwargs):
+        self.icons = {}
+        self._icon_colours = {}
+        super().__init__(*args, **kwargs)
+
+    @log_class
+    def add(self, text, name = None, stretch = False, hover = None,
+            select = None, **kwargs):
+        """
+        Add a new icon to the right of the set
+
+        Parameters
+        ----------
+        text : str
+            Text to display on icon
+        name : str, optional
+            Friendly name to refer to the icon widget in the backend.
+            The default is the text argument.
+        stretch : bool, optional
+            Stretch the icon horizontally or not?. The default is False.
+        hover : colour, optional
+            Colour of the icon when hovering over it with the mouse. The
+            default is None.
+        select : colour, optional
+            Colour of the icon when it is the last one clicked. The
+            default is None.
+        **kwargs : *
+            widget kwargs for the Label.
+
+        Returns
+        -------
+        icon : tk.Label
+        """
+        if name is None:
+            name = text
+
+        icon = tk.Label(self, text = text, **kwargs)
+        column = len(self.icons)
+
+        if stretch:
+            self.columnconfigure(column, weight = 1)
+
+        icon.grid(row = 0, column = len(self.icons), **c.GRID_STICKY)
+        icon.name = name
+        fg = icon.cget('fg')
+
+        self._icon_colours[name] = {'fg': fg, 'current': fg}
+
+        # update the foreground colour when hovering over the icon
+        if not hover is None:
+            self._icon_colours[name]['hover'] = hover
+            def enter_func(event):
+                w = event.widget
+                self._icon_colours[w.name]["current"] = w.cget('fg')
+                w.config(fg = self._icon_colours[w.name]["hover"])
+
+            def leave_func(event):
+                w = event.widget
+                w.config(fg = self._icon_colours[w.name]["current"])
+
+            icon.bind("<Enter>", enter_func)
+            icon.bind("<Leave>", leave_func)
+
+        # update the foreground colour when the icon is the last one clicked
+        if not select is None:
+            self._icon_colours[name]['select'] = select
+            def click_func(event):
+                print("click")
+                w = event.widget
+                for icon in self.icons:
+                    if icon != w.name:
+                        self[icon].config(fg = self._icon_colours[icon]['fg'])
+                col = self._icon_colours[w.name]["select"]
+                self._icon_colours[w.name]["current"] = col
+                w.config(fg = col)
+
+            icon.bind("<1>", click_func)
+
+        self.icons[name] = icon
+        return icon
+
+    def __getitem__(self, name):
+        return self.icons[name]
 
 class TrimmedFrame(tk.Frame):
     @log_class
