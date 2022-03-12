@@ -97,6 +97,8 @@ class TagSelection(tk.Toplevel):
             font = ("Helvetica", 24)
             )
 
+        self._tag_images = {}
+
         widgets = {1: {'widget': self.text,
                        'grid_kwargs': c.GRID_STICKY,
                        'stretch_width': True},
@@ -132,21 +134,102 @@ class TagSelection(tk.Toplevel):
 
     @log_class
     def tag_name_change(self, *args):
+        """ Called when the dropdown value for tag name changes """
         if self.tag_name.get() == self.tag_name_new:
             self.ask_new_tag_name()
+
+        # generate suggested tags for new tag name
+        self.clear_suggested_tags()
+        self.add_tag_suggestions(self.tag_name.get())
+
         self.tag_value_entry.focus()
 
     @log_class
     def get_tag_combinations(self):
         query = "SELECT DISTINCT tag_name, tag_value FROM entry_tags"
-        result = base.polygon_db.entries.select(query)
+        result = base.polygon_db.entry_tags.select(query)
         return result
+
+    @log_class
+    def get_tag_count(self):
+        return len(self._tag_images)
+
+    @log_class
+    def get_latest_tag_values(self, name, n = 5):
+        """ Get the set of n most recently used values for a tag name """
+        query = """SELECT DISTINCT tag_value FROM
+            entry_tags t LEFT JOIN entries e
+            ON t.[entry_id] = e.entry_id
+            WHERE tag_name = '%s'
+            GROUP BY tag_value
+            ORDER BY MAX(entry_date) DESC
+            LIMIT %s""" % (name, n)
+        result = base.polygon_db.entry_tags.select(query)
+        return [row[0] for row in result]
+
+    @log_class
+    def clear_suggested_tags(self):
+        """ Remove suggested tag images """
+        for widget in self._tag_images:
+            # fix error with leave event being triggered on grid_forget
+            widget.unbind("<Leave>")
+            widget.grid_forget()
+        del self._tag_images
+        self._tag_images = {}
+
+    @log_class
+    def add_tag_suggestions(self, name):
+        """ Add tag suggestion images below the window for a given tag name """
+        values = self.get_latest_tag_values(name)
+
+        for value in values:
+            tag_col = self.get_tag_count()
+            tag = self.get_tag_widget(value)
+            tag.grid(row = tag_col + 4, column = 0, ipady = 2, sticky = "nsw")
+
+    @log_class
+    def get_tag_widget(self, value):
+        """ Get Label widget containing a tag with given text """
+        # the standard image to show
+        tag_img = ImageTk.PhotoImage(image = tagf.text_tag(value, height = 40))
+        # the image to show when hovered over (darker cross)
+        tag_img_hover = ImageTk.PhotoImage(
+            image = tagf.text_tag(value, height = 40, x_colour = "gray"))
+
+        tag_widget = tk.Label(
+            self, image = tag_img, cursor = "hand2", bg = c.COLOUR_TRANSPARENT)
+        tag_widget.tag_value = value
+        self._tag_images[tag_widget] = {"standard": tag_img,
+                                      "hover": tag_img_hover}
+
+        tag_widget.bind("<Enter>", self._enter_tag_widget)
+        tag_widget.bind("<Leave>", self._leave_tag_widget)
+        tag_widget.bind("<ButtonRelease-1>", self._click_tag_widget)
+        return tag_widget
+
+    @log_class
+    def _enter_tag_widget(self, event):
+        """ Set hover image on entering tag widget """
+        event.widget.config(image = self._tag_images[event.widget]["hover"])
+
+    @log_class
+    def _leave_tag_widget(self, event):
+        """ Set standard image on entering tag widget """
+        event.widget.config(image = self._tag_images[event.widget]["standard"])
+
+    @log_class
+    def _click_tag_widget(self, event):
+        """ Set the tag value to the clicked value. Remove all suggestions """
+        self.tag_value_entry.delete(0, 'end')
+        self.tag_value_entry.insert(0, event.widget.tag_value)
+        self.clear_suggested_tags()
 
     @log_class
     def get_tag_names(self):
         """ Get list of distinct tag names already used """
         names = list({tag[0] for tag in self.current_tags})
-        return names
+
+        return sorted(names)
 
     @log_class
     def get_tag_values(self, name):
@@ -334,7 +417,7 @@ class TitleModuleEditable(TitleModule):
     def ask_tag(self, *args):
         """ Open an interface to select the tag name and value """
         self.tag_window = TagSelection(
-            self.master, bg = c.COLOUR_FILM_BACKGROUND)
+            self.master, bg = c.COLOUR_TRANSPARENT)
         self.tag_window.lift()
         self.tag_window.bind("<Return>", self.get_tag)
         self.tag_window.bind("<<TickClick>>", self.get_tag)
@@ -544,9 +627,10 @@ class LogEntryWindow(tk.Toplevel):
     @log_class
     def start(self):
         self.overrideredirect(True)
-        self.transient(self.master)
+        # self.transient(self.master)
         self.bind("<Escape>", lambda event: self.destroy())
         self.lift()
+        self.grab_set()
         get_tk(self).eval(f'tk::PlaceWindow {self} center')
         self.mainloop()
 
