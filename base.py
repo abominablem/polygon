@@ -153,7 +153,6 @@ class IconSet(tk.Frame):
         if not select is None:
             self._icon_colours[name]['select'] = select
             def click_func(event):
-                print("click")
                 w = event.widget
                 for icon in self.icons:
                     if icon != w.name:
