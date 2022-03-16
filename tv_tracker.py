@@ -395,6 +395,8 @@ class DownloadData(tk.Toplevel):
             base.polygon_db.titles.update(
                 filters = {"title_id": title_id}, **values)
 
+        self.event_generate("<<Import>>")
+
     @log_class
     def add_episodes(self, titles):
         self.table.clear()
@@ -458,11 +460,11 @@ class TvTracker(tk.Frame):
         """ Build header with buttons and summary """
         self._pixel = tk.PhotoImage(width = 1, height = 1)
         self.widget_frame = tk.Frame(self, bg = c.COLOUR_TV_BACKGROUND)
-        self.show_title_frame = base.TrimmedFrame(self.widget_frame, height = 100)
+        self.show_title_frame = base.TrimmedFrame(self.widget_frame)
         self.show_title = tk.Label(
             self.show_title_frame.inner, font = ("Helvetica", 46), padx = 10,
-            text = "placeholder text", width = 1000, image = self._pixel,
-            compound = "left", anchor = "w", height = 100
+            text = "placeholder text", width = 800, image = self._pixel,
+            compound = "left", anchor = "w"
             )
         self.show_title.grid(row = 0, column = 0, **c.GRID_STICKY)
         self.show_title_frame.columnconfigure(0, weight = 1)
@@ -470,12 +472,10 @@ class TvTracker(tk.Frame):
 
         self.btn_add_new = PolygonButton(
             self.widget_frame, text = "+", command = self.add_new,
-            width = 130, anchor = "center", font = ("Calibri", 45),
-            height = 100
+            width = 130, anchor = "center", font = ("Calibri", 45)
             )
         self.season_display = SeasonCounter(
-            self.widget_frame, bg = c.COLOUR_TV_BACKGROUND, width = 200,
-            height = 100
+            self.widget_frame, bg = c.COLOUR_TV_BACKGROUND, width = 200
             )
         self.season_display.bind("<<SeasonChange>>", self.update_table)
 
@@ -854,7 +854,12 @@ class TvTracker(tk.Frame):
                     for episode in season.values()]
         self.download_window = DownloadData(self, bg = c.COLOUR_TRANSPARENT)
         self.download_window.add_episodes(episodes)
+        self.download_window.bind("<<Import>>", self._download_click_import)
         self.download_window.start()
+
+    def _download_click_import(self, event = None):
+        self._click_refresh()
+        self.download_window.destroy()
 
     @log_class
     def _click_search(self, event = None):
