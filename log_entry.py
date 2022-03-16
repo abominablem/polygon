@@ -223,6 +223,7 @@ class TagSelection(tk.Toplevel):
         self.tag_value_entry.delete(0, 'end')
         self.tag_value_entry.insert(0, event.widget.tag_value)
         self.clear_suggested_tags()
+        self.event_generate("<<TickClick>>")
 
     @log_class
     def get_tag_names(self):
