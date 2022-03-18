@@ -366,6 +366,7 @@ class TitleModuleEditable(TitleModule):
     @log_class
     def get_values(self):
         val_dict = self.get_dict()
+        if val_dict["rating"] == 0: val_dict["rating"] = None
         return_dict = {
             "entry_date": val_dict["date"],
             "rating": val_dict["rating"],
