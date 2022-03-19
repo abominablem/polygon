@@ -196,7 +196,8 @@ class TrimmedFrame(tk.Frame):
 
 polygon_db = MultiConnection(
     r".\data\polygon.db",
-    ["series", "episodes", "titles", "entries", "entry_tags", "title_tags"],
+    ["series", "episodes", "titles", "entries", "entry_tags", "title_tags",
+     "watchlist"],
     debug = c.DEBUG
     )
 
