@@ -392,6 +392,7 @@ class DownloadData(tk.Toplevel):
         for title_id in self.table.selection():
             title = imdbf.get_title(title_id, refresh = True)
             values = {attr: title[attr] for attr in attr_list}
+            values['update_date'] = base.polygon_db.getdate()
             base.polygon_db.titles.update(
                 filters = {"title_id": title_id}, **values)
 
