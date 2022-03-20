@@ -675,7 +675,7 @@ class IMDbFunctions:
 
         if (td['imdb_user_rating'] == 'None' or
             td['year'] == 'None' or
-            td['year'] > td['import_date'][:4] or
+            str(td['year']) > td['import_date'][:4] or
             td['title'][-7:] == ' - IMDb'):
             return True
 
@@ -1028,9 +1028,6 @@ class IMDbWatchlistFunctions(IMDbBaseTitleFunctions):
         raise NotImplementedError
 
 imdbf = IMDbFunctions()
-# base.polygon_db.close()
-# imdbf.add_to_watchlist(title_id = 'tt0063628', log_date = '2021-12-24 00:00:00')
 
-print(imdbf.title_is_unreleased('tt8342896'))
-
-imdbf.update_title("tt10906300")
+if __name__ == "__main__":
+    pass
