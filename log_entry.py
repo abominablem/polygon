@@ -329,8 +329,8 @@ class TitleModuleEditable(TitleModule):
         self.rating.bind("<Leave>", self._leave_rating)
         self.rating.bind("<1>", self.lock_rating)
 
-        self.date.config(cursor = "hand2")
-        self.date.bind("<1>", self._click_date)
+        self.base_module.date.config(cursor = "hand2")
+        self.base_module.date.bind("<1>", self._click_date)
 
         with Image.open(r".\common\tag_outlined.png") as image:
             self.tag_icon_image = {

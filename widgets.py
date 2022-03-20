@@ -29,8 +29,10 @@ class RatingDisplay(tk.Text):
     @log_class
     def __init__(self, master, min_rating = 1, max_rating = 10, **kwargs):
 
-        self.set_symbol(empty_symbol = "☆", filled_symbol = "★")
-        self.set_colour(empty_colour = "#D3D3D3", filled_colour = "black")
+        self.set_symbol(empty_symbol = "☆", filled_symbol = "★",
+                        half_symbol = "★")
+        self.set_colour(empty_colour = "#D3D3D3", filled_colour = "black",
+                        half_colour = "black")
         self.set_colour_map({})
 
         self.min_rating = min_rating
@@ -38,13 +40,15 @@ class RatingDisplay(tk.Text):
         self.rating = 1
         self._capture_kwarg(kwargs, "empty_symbol", "_symbol_empty")
         self._capture_kwarg(kwargs, "filled_symbol", "_symbol_filled")
+        self._capture_kwarg(kwargs, "half_symbol", "_symbol_half")
         self._capture_kwarg(kwargs, "empty_colour", "_colour_empty")
         self._capture_kwarg(kwargs, "filled_colour", "_colour_filled")
+        self._capture_kwarg(kwargs, "half_colour", "_colour_half")
         self._capture_kwarg(kwargs, "colour_map", "colour_map")
 
         kwargs = self._remove_kwargs(kwargs, [
             "empty_symbol", "filled_symbol", "empty_colour", "filled_colour",
-            "colour_map"
+            "colour_map", 'half_colour', 'half_symbol'
             ])
 
         super().__init__(master, **kwargs, height = 1, wrap = 'none',
@@ -86,16 +90,20 @@ class RatingDisplay(tk.Text):
         if not max is None: self.max_rating = max
 
     @log_class
-    def set_symbol(self, empty_symbol = None, filled_symbol = None):
+    def set_symbol(self, empty_symbol = None, filled_symbol = None,
+                   half_symbol = None):
         """ Set the symbols for filled and empty rating symbols """
         if not empty_symbol is None: self._symbol_empty = empty_symbol
         if not filled_symbol is None: self._symbol_filled = filled_symbol
+        if not half_symbol is None: self._symbol_half = half_symbol
 
     @log_class
-    def set_colour(self, empty_colour = None, filled_colour = None):
+    def set_colour(self, empty_colour = None, filled_colour = None,
+                   half_colour = None):
         """ Set the colours of filled and empty rating symbols """
         if not empty_colour is None: self._colour_empty = empty_colour
         if not filled_colour is None: self._colour_filled = filled_colour
+        if not half_colour is None: self._colour_half = half_colour
 
     @log_class
     def set_colour_map(self, colour_map):
@@ -110,21 +118,26 @@ class RatingDisplay(tk.Text):
             if isinstance(col_def, dict):
                 col_def.setdefault("empty_colour", self._colour_empty)
                 col_def.setdefault("filled_colour", self._colour_filled)
+                col_def.setdefault("half_colour", col_def["filled_colour"])
             else:
                 col_def = {"filled_colour": col_def,
-                           "empty_colour": self._colour_empty}
+                           "empty_colour": self._colour_empty,
+                           "half_colour": col_def}
             colour_map[rating] = col_def
         self.colour_map = colour_map
 
     @log_class
     def _set_colour_tags(self):
         """ Colour the text according to rules defined so far """
-        colfill = self.colour_map.get(self.rating, {}).get(
+        colfill = self.colour_map.get(round(self.rating), {}).get(
             "filled_colour", self._colour_filled)
-        colempty = self.colour_map.get(self.rating, {}).get(
+        colempty = self.colour_map.get(round(self.rating), {}).get(
             "empty_colour", self._colour_empty)
+        colhalf = self.colour_map.get(round(self.rating), {}).get(
+            "half_colour", self._colour_half)
         self.tag_config("filled_rating", foreground = colfill)
         self.tag_config("empty_rating", foreground = colempty)
+        self.tag_config("half_rating", foreground = colhalf)
 
     @log_class
     def _clear(self):
@@ -142,9 +155,16 @@ class RatingDisplay(tk.Text):
         self._clear()
         self._set_colour_tags()
         self.configure(state='normal')
-        self.insert("end", self._symbol_filled * rating,
+        is_decimal = (int(rating) != rating)
+        len_filled = int(rating)
+        len_half = 1 if is_decimal else 0
+        len_empty = self.max_rating - len_filled - len_half
+
+        self.insert("end", self._symbol_filled * len_filled,
                     ["filled_rating", 'center'])
-        self.insert("end", self._symbol_empty * (self.max_rating - rating),
+        self.insert("end", self._symbol_half * len_half,
+                    ["half_rating", 'center'])
+        self.insert("end", self._symbol_empty * len_empty,
                     ["empty_rating", 'center'])
         self.configure(state='disabled')
 
@@ -186,50 +206,44 @@ class RatingDisplay(tk.Text):
         """ Get the width of the text currently inside the widget """
         return self.font.measure(self.get('0.1', 'end').strip())
 
-class TitleModule(tk.Frame):
-    """ Bordered frame containing Date, Title, Original title, Director, Year,
-    Runtime, and Rating """
-    @log_class
-    def __init__(self, master, include_rewatch = True, include_number = True,
-                 **kwargs):
-        self.master = master
-        super().__init__(self.master, **kwargs)
+class TitleModuleBase(tk.Frame):
+    def __init__(self, master, **kwargs):
+        super().__init__(master, **kwargs)
 
         font_date = ("Calibri", 28, "bold")
         font_title = ("Calibri", 32)
         font_subtitle = ("Calibri", 22, "italic")
-        font_rating = ("Calibri", 36, "bold")
-        font_rewatch = ("Calibri", 36)
-        font_number = ("Calibri", 36)
 
-        self.border_frame = base.TrimmedFrame(self)
-        self.border_frame.columnconfigure(0, weight = 1)
+        self._value_dict = {
+            "title": None, "original_title": None, "director": None,
+            "year": None, "runtime": None, "date": None
+            }
 
-        self.widget_frame = tk.Frame(self.border_frame.inner)
+        self._original_title_text = ""
+
         self.date = tk.Label(
-            self.widget_frame, bg = "white", anchor = "center",
-            font = font_date, padx = 20, pady = 0, width = 10
+            self, bg = "white", anchor = "center", font = font_date, padx = 20,
+            pady = 0, width = 10
             )
         self.title = tk.Label(
-            self.widget_frame, bg = "white", anchor = "w", font = font_title,
-            padx = 10, pady = 0, width = 40
+            self, bg = "white", anchor = "w", font = font_title, padx = 10,
+            pady = 0, width = 40
             )
         self.original_title = tk.Label(
-            self.widget_frame, bg = "white", anchor = "w",
-            font = font_subtitle, padx = 10, pady = 0
+            self, bg = "white", anchor = "w", font = font_subtitle, padx = 10,
+            pady = 0
             )
-        self._original_title_text = ""
         self.director = tk.Label(
-            self.widget_frame, bg = "white", anchor = "e",
-            font = font_subtitle, padx = 10, pady = 0
+            self, bg = "white", anchor = "e", font = font_subtitle, padx = 10,
+            pady = 0
             )
         self.year = tk.Label(
-            self.widget_frame, bg = "white", anchor = "center",
-            font = font_title, padx = 20, pady = 0
+            self, bg = "white", anchor = "center", font = font_title,
+            padx = 20, pady = 0
             )
         self.runtime = tk.Label(
-            self.widget_frame, bg = "white", anchor = "center",
-            font = font_subtitle, padx = 20, pady = 0
+            self, bg = "white", anchor = "center", font = font_subtitle,
+            padx = 20, pady = 0
             )
 
         widgets = {1: {'widget': self.date,
@@ -253,9 +267,70 @@ class TitleModule(tk.Frame):
                    }
 
         self.widget_set = tka.WidgetSet(
-            self.widget_frame, widgets, layout = [[1, 2, 2, 5],
-                                                  [1, 3, 4, 6]])
-        self.widget_frame.grid(row = 0, column = 0, **c.GRID_STICKY)
+            self, widgets, layout = [[1, 2, 2, 5],
+                                     [1, 3, 4, 6]])
+
+    @log_class
+    def set_text(self, **kwargs):
+        self._value_dict.update(kwargs)
+        for kw in kwargs:
+            if kw == "runtime":
+                self.runtime.config(text = self.format_runtime(kwargs[kw]))
+
+            elif kw == "title":
+                text = kwargs[kw]
+                if text == self.original_title.cget('text')[1:-1]:
+                    self.original_title.config(text = "")
+                    self.title.config(text = text)
+                else:
+                    self.original_title.config(
+                        text = "(%s)" % self._original_title_text
+                        )
+                    self.title.config(text = text)
+
+            elif kw == "original_title":
+                text = kwargs[kw]
+                self._original_title_text = text
+                if text == self.title.cget('text'):
+                    self.original_title.config(text = "")
+                else:
+                    self.original_title.config(text = "(%s)" % text)
+
+            elif kw == "date":
+                self.date.config(text = self.format_date(kwargs[kw]))
+
+            else:
+                self.__dict__[kw].config(text = kwargs[kw])
+
+    @log_class
+    def format_runtime(self, runtime):
+        try:
+            return futil.format_time(int(runtime), "minutes")
+        except ValueError:
+            return "N/A"
+
+    @log_class
+    def format_date(self, date):
+        return datetime.strptime(date, "%Y-%m-%d").strftime("%d %b %Y")
+
+class TitleModule(tk.Frame):
+    """ Bordered frame containing Date, Title, Original title, Director, Year,
+    Runtime, and Rating """
+    @log_class
+    def __init__(self, master, include_rewatch = True, include_number = True,
+                 **kwargs):
+        self.master = master
+        super().__init__(self.master, **kwargs)
+
+        font_rating = ("GNU Unifont", 36, "bold")
+        font_rewatch = ("Calibri", 36)
+        font_number = ("Calibri", 36)
+
+        self.border_frame = base.TrimmedFrame(self)
+        self.border_frame.columnconfigure(0, weight = 1)
+
+        self.base_module = TitleModuleBase(self.border_frame.inner)
+        self.base_module.grid(row = 0, column = 0, **c.GRID_STICKY)
 
         """ Title rating """
         self.rating_frame = tk.Frame(self.border_frame.inner)
@@ -310,17 +385,6 @@ class TitleModule(tk.Frame):
             }
 
     @log_class
-    def format_runtime(self, runtime):
-        try:
-            return futil.format_time(int(runtime), "minutes")
-        except ValueError:
-            return "N/A"
-
-    @log_class
-    def format_date(self, date):
-        return datetime.strptime(date, "%Y-%m-%d").strftime("%d %b %Y")
-
-    @log_class
     def get_dict(self):
         return self._value_dict
 
@@ -328,33 +392,12 @@ class TitleModule(tk.Frame):
     def set_text(self, **kwargs):
         self._value_dict.update(kwargs)
         for kw in kwargs:
-            if kw == "rating":
-                self.rating.set(int(kwargs[kw]))
+            if kw in ["runtime", "title", "original_title", "date", "director",
+                      "year"]:
+                self.base_module.set_text(**{kw: kwargs[kw]})
 
-            elif kw == "runtime":
-                self.runtime.config(text = self.format_runtime(kwargs[kw]))
-
-            elif kw == "title":
-                text = kwargs[kw]
-                if text == self.original_title.cget('text')[1:-1]:
-                    self.original_title.config(text = "")
-                    self.title.config(text = text)
-                else:
-                    self.original_title.config(
-                        text = "(%s)" % self._original_title_text
-                        )
-                    self.title.config(text = text)
-
-            elif kw == "original_title":
-                text = kwargs[kw]
-                self._original_title_text = text
-                if text == self.title.cget('text'):
-                    self.original_title.config(text = "")
-                else:
-                    self.original_title.config(text = "(%s)" % text)
-
-            elif kw == "date":
-                self.date.config(text = self.format_date(kwargs[kw]))
+            elif kw == "rating":
+                self.rating.set(float(kwargs[kw]))
 
             elif kw == "rewatch" and self.include_rewatch:
                 if kwargs[kw]:
@@ -998,8 +1041,8 @@ class PolygonProgressBar(tk.Toplevel):
 
 
 # test = "RatingDisplay"
-# test = "TitleModule"
-test = "FlexLabel"
+test = "TitleModule"
+# test = "FlexLabel"
 
 if __name__ == "__main__":
     root = tk.Tk()
@@ -1043,7 +1086,7 @@ if __name__ == "__main__":
         title.set_text(
             date = "2022-01-22", title = "The Last Duel",
             director = "Ridley Scott", original_title = "The Last Duel",
-            year = 2021, runtime = "156", rating = 6, rewatch = True,
+            year = 2021, runtime = "156", rating = 4.5, rewatch = True,
             number = 1
             )
         title.grid(row = 0, column = 0, sticky = "nesw")
