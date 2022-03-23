@@ -411,7 +411,7 @@ class DownloadData(tk.Toplevel):
 
     @log_class
     def get_values(self, title):
-        query = f""" SELECT e.entry_date, t.import_date FROM titles t
+        query = f""" SELECT e.entry_date, t.update_date FROM titles t
                     LEFT JOIN (SELECT * FROM entries e
                                WHERE title_id = '{title.title_id}'
                                    AND rewatch = 'False') e
@@ -420,15 +420,15 @@ class DownloadData(tk.Toplevel):
                     """
         result = base.polygon_db.titles.select(query)
         if len(result) == 0:
-            new_episode = "Yes"; entry_date = ""; import_date = ""
+            new_episode = "Yes"; entry_date = ""; update_date = ""
         else:
             new_episode = "No"
             entry_date = self.format_time(result[0][0])
-            import_date = self.format_time(result[0][1])
+            update_date = self.format_time(result[0][1])
 
         return ("☐", title.season, title.episode, title.title,
                 self.format_time(title.release_date), entry_date, new_episode,
-                self.format_time(import_date))
+                self.format_time(update_date))
 
     @log_class
     def format_time(self, time: str) -> str:
