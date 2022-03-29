@@ -11,6 +11,7 @@ import tkinter.font as tkf
 from datetime import datetime
 import math
 import re
+from PIL import Image, ImageTk
 
 import sys
 sys.path.append("D:\\Users\\Marcus\\Documents\\R Documents\\Coding\\Python\\Packages")
@@ -21,6 +22,7 @@ import constants as c
 import futil as futil
 import base
 from imdb_functions import imdbf, standardise_id
+import log_entry_tag as tagf
 
 log_class = log_class(c.LOG_LEVEL)
 
@@ -1038,6 +1040,48 @@ class PolygonProgressBar(tk.Toplevel):
         self.grab_set()
         self.lift()
         self.mainloop()
+
+class HoverIcon(tk.Label):
+    """ Class for images with a standard and hover state """
+    def __init__(self, master, standard, hover = None, **kwargs):
+        if "image" in kwargs:
+            raise ValueError("Image argument should be set through the "
+                             "'standard' keyword")
+        kwargs.setdefault("cursor", "hand2")
+        self.enable_hover = not hover is None
+        self.image_standard = standard
+        self.image_hover = hover
+        super().__init__(master, **kwargs, image = self.image_standard)
+
+        if self.enable_hover:
+            self.bind("<Enter>", self._enter)
+            self.bind("<Leave>", self._leave)
+
+    def _enter(self, *args):
+        self.config(image = self.image_hover)
+
+    def _leave(self, *args):
+        self.config(image = self.image_standard)
+
+class HoverIconTick(HoverIcon):
+    def __init__(self, master, height, **kwargs):
+        super().__init__(
+            master,
+            standard = ImageTk.PhotoImage(
+                tagf.tick_image(height = height, colour = "black")),
+            hover = ImageTk.PhotoImage(
+                tagf.tick_image(height = height, colour = "gray")),
+            **kwargs)
+
+class HoverIconCross(HoverIcon):
+    def __init__(self, master, height, **kwargs):
+        super().__init__(
+            master,
+            standard = ImageTk.PhotoImage(
+                tagf.x_image(height = height, colour = "black")),
+            hover = ImageTk.PhotoImage(
+                tagf.x_image(height = height, colour = "gray")),
+            **kwargs)
 
 
 # test = "RatingDisplay"

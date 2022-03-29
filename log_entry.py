@@ -8,7 +8,7 @@ import sys
 sys.path.append("D:\\Users\\Marcus\\Documents\\R Documents\\Coding\\Python\\Packages")
 import tkinter as tk
 from tkinter import ttk, simpledialog
-from widgets import TitleModule
+from widgets import TitleModule, HoverIcon, HoverIconTick, HoverIconCross
 from PIL import Image, ImageTk
 import tkcalendar as tkcal
 from datetime import datetime
@@ -33,47 +33,25 @@ class TagSelection(tk.Toplevel):
         self.widget_frame.rowconfigure(0, weight = 1)
         self.widget_frame.columnconfigure(0, weight = 1)
 
-        self.x_image = {
-            "standard": ImageTk.PhotoImage(
-                tagf.x_image(height = 50, colour = "black")
-                ),
-            "hover": ImageTk.PhotoImage(
-                tagf.x_image(height = 50, colour = "gray")
-                )
-            }
-
-        self.tick_image = {
-            "standard": ImageTk.PhotoImage(
-                tagf.tick_image(height = 50, colour = "black")
-                ),
-            "hover": ImageTk.PhotoImage(
-                tagf.tick_image(height = 50, colour = "gray")
-                )
-            }
-
         self.icon_frame = tk.Frame(self, bg = c.COLOUR_TRANSPARENT)
         self.icon_frame.grid(row = 0, column = 1, **c.GRID_STICKY)
 
-        self.x_label = tk.Label(
-            self.icon_frame, bg = c.COLOUR_TRANSPARENT,
-            image = self.x_image["standard"], anchor = "n", cursor = "hand2"
+        self.x_label = HoverIconCross(
+            self.icon_frame, bg = c.COLOUR_TRANSPARENT, height = 50,
+            anchor = "n"
             )
         self.x_label.grid(row = 0, column = 0, **c.GRID_STICKY)
-        self.x_label.bind("<Enter>", self._enter_x)
-        self.x_label.bind("<Leave>", self._leave_x)
         self.x_label.bind("<1>", self._click_x)
 
         label_padding = tk.Frame(self.icon_frame, bg = c.COLOUR_TRANSPARENT)
         label_padding.grid(row = 1, column = 0, **c.GRID_STICKY)
         self.icon_frame.rowconfigure(1, weight = 1)
 
-        self.tick_label = tk.Label(
-            self.icon_frame, bg = c.COLOUR_TRANSPARENT,
-            image = self.tick_image["standard"], anchor = "n", cursor = "hand2"
+        self.tick_label = HoverIconTick(
+            self.icon_frame, bg = c.COLOUR_TRANSPARENT, height = 50,
+            anchor = "s"
             )
         self.tick_label.grid(row = 2, column = 0, **c.GRID_STICKY)
-        self.tick_label.bind("<Enter>", self._enter_tick)
-        self.tick_label.bind("<Leave>", self._leave_tick)
         self.tick_label.bind("<1>", self._click_tick)
 
         self.text = tk.Label(
@@ -196,26 +174,14 @@ class TagSelection(tk.Toplevel):
         tag_img_hover = ImageTk.PhotoImage(
             image = tagf.text_tag(value, height = 40, x_colour = "gray"))
 
-        tag_widget = tk.Label(
-            self, image = tag_img, cursor = "hand2", bg = c.COLOUR_TRANSPARENT)
+        tag_widget = HoverIcon(
+            self.icon_frame, bg = c.COLOUR_TRANSPARENT,
+            standard = tag_img, hover = tag_img_hover
+            )
         tag_widget.tag_value = value
-        self._tag_images[tag_widget] = {"standard": tag_img,
-                                      "hover": tag_img_hover}
 
-        tag_widget.bind("<Enter>", self._enter_tag_widget)
-        tag_widget.bind("<Leave>", self._leave_tag_widget)
         tag_widget.bind("<ButtonRelease-1>", self._click_tag_widget)
         return tag_widget
-
-    @log_class
-    def _enter_tag_widget(self, event):
-        """ Set hover image on entering tag widget """
-        event.widget.config(image = self._tag_images[event.widget]["hover"])
-
-    @log_class
-    def _leave_tag_widget(self, event):
-        """ Set standard image on entering tag widget """
-        event.widget.config(image = self._tag_images[event.widget]["standard"])
 
     @log_class
     def _click_tag_widget(self, event):
@@ -259,25 +225,9 @@ class TagSelection(tk.Toplevel):
         self.tag_value_entry.focus_force()
 
     @log_class
-    def _enter_x(self, *args):
-        self.x_label.config(image = self.x_image["hover"])
-
-    @log_class
-    def _leave_x(self, *args):
-        self.x_label.config(image = self.x_image["standard"])
-
-    @log_class
     def _click_x(self, *args):
         self.master.focus_force()
         self.destroy()
-
-    @log_class
-    def _enter_tick(self, *args):
-        self.tick_label.config(image = self.tick_image["hover"])
-
-    @log_class
-    def _leave_tick(self, *args):
-        self.tick_label.config(image = self.tick_image["standard"])
 
     @log_class
     def _click_tick(self, *args):
@@ -586,38 +536,14 @@ class LogEntryWindow(tk.Toplevel):
         self.data.grid(row = 0, column = 1, **c.GRID_STICKY)
         self.data_frame.grid(row = 0, column = 1, **c.GRID_STICKY)
 
-        self.x_image = {
-            "standard": ImageTk.PhotoImage(
-                tagf.x_image(height = 100, colour = "black")
-                ),
-            "hover": ImageTk.PhotoImage(
-                tagf.x_image(height = 100, colour = "gray")
-                )
-            }
-        self.x_label = tk.Label(
-            self, bg = c.COLOUR_TRANSPARENT, image = self.x_image["standard"],
-            anchor = "n", cursor = "hand2"
-            )
+        self.x_label = HoverIconCross(
+            self, bg = c.COLOUR_TRANSPARENT, height = 100, anchor = "n")
         self.x_label.grid(row = 0, column = 0, **c.GRID_STICKY)
-        self.x_label.bind("<Enter>", self._enter_x)
-        self.x_label.bind("<Leave>", self._leave_x)
         self.x_label.bind("<1>", self._click_x)
 
-        self.tick_image = {
-            "standard": ImageTk.PhotoImage(
-                tagf.tick_image(height = 100, colour = "black")
-                ),
-            "hover": ImageTk.PhotoImage(
-                tagf.tick_image(height = 100, colour = "gray")
-                )
-            }
-        self.tick_label = tk.Label(
-            self, bg = c.COLOUR_TRANSPARENT, image = self.tick_image["standard"],
-            anchor = "n", cursor = "hand2"
-            )
+        self.tick_label = HoverIconTick(
+            self, bg = c.COLOUR_TRANSPARENT, height = 100, anchor = "n")
         self.tick_label.grid(row = 0, column = 2, **c.GRID_STICKY)
-        self.tick_label.bind("<Enter>", self._enter_tick)
-        self.tick_label.bind("<Leave>", self._leave_tick)
         self.tick_label.bind("<1>", self._click_tick)
 
     @log_class
@@ -641,25 +567,9 @@ class LogEntryWindow(tk.Toplevel):
         return self.data.get_values()
 
     @log_class
-    def _enter_x(self, *args):
-        self.x_label.config(image = self.x_image["hover"])
-
-    @log_class
-    def _leave_x(self, *args):
-        self.x_label.config(image = self.x_image["standard"])
-
-    @log_class
     def _click_x(self, *args):
         self.event_generate("<<Destroy>>")
         self.destroy()
-
-    @log_class
-    def _enter_tick(self, *args):
-        self.tick_label.config(image = self.tick_image["hover"])
-
-    @log_class
-    def _leave_tick(self, *args):
-        self.tick_label.config(image = self.tick_image["standard"])
 
     @log_class
     def _click_tick(self, *args):
