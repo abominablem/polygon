@@ -1063,6 +1063,22 @@ class HoverIcon(tk.Label):
     def _leave(self, *args):
         self.config(image = self.image_standard)
 
+class HoverIconPath(HoverIcon):
+    def __init__(self, master, standard, dimensions = None, hover = None,
+                 **kwargs):
+        super().__init__(
+            master, standard = self.get_image(standard, dimensions),
+            hover = self.get_image(hover, dimensions), **kwargs
+            )
+
+    def get_image(self, path, dimensions = None):
+        if path is None:
+            return
+        with Image.open(path) as image:
+            if not dimensions is None:
+                image = image.resize(dimensions)
+            return ImageTk.PhotoImage(image)
+
 class HoverIconTick(HoverIcon):
     def __init__(self, master, height, **kwargs):
         super().__init__(

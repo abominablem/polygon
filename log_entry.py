@@ -8,7 +8,8 @@ import sys
 sys.path.append("D:\\Users\\Marcus\\Documents\\R Documents\\Coding\\Python\\Packages")
 import tkinter as tk
 from tkinter import ttk, simpledialog
-from widgets import TitleModule, HoverIcon, HoverIconTick, HoverIconCross
+from widgets import (TitleModule, HoverIcon, HoverIconTick, HoverIconCross,
+                     HoverIconPath)
 from PIL import Image, ImageTk
 import tkcalendar as tkcal
 from datetime import datetime
@@ -75,7 +76,7 @@ class TagSelection(tk.Toplevel):
             font = ("Helvetica", 24)
             )
 
-        self._tag_images = {}
+        self._suggested_tags = []
 
         widgets = {1: {'widget': self.text,
                        'grid_kwargs': c.GRID_STICKY,
@@ -130,7 +131,7 @@ class TagSelection(tk.Toplevel):
 
     @log_class
     def get_tag_count(self):
-        return len(self._tag_images)
+        return len(self._suggested_tags)
 
     @log_class
     def get_latest_tag_values(self, name, n = 5):
@@ -148,12 +149,11 @@ class TagSelection(tk.Toplevel):
     @log_class
     def clear_suggested_tags(self):
         """ Remove suggested tag images """
-        for widget in self._tag_images:
+        for widget in self._suggested_tags:
             # fix error with leave event being triggered on grid_forget
             widget.unbind("<Leave>")
             widget.grid_forget()
-        del self._tag_images
-        self._tag_images = {}
+        self._suggested_tags = []
 
     @log_class
     def add_tag_suggestions(self, name):
@@ -175,9 +175,10 @@ class TagSelection(tk.Toplevel):
             image = tagf.text_tag(value, height = 40, x_colour = "gray"))
 
         tag_widget = HoverIcon(
-            self.icon_frame, bg = c.COLOUR_TRANSPARENT,
-            standard = tag_img, hover = tag_img_hover
+            self, bg = c.COLOUR_TRANSPARENT, standard = tag_img,
+            hover = tag_img_hover
             )
+        self._suggested_tags.append(tag_widget)
         tag_widget.tag_value = value
 
         tag_widget.bind("<ButtonRelease-1>", self._click_tag_widget)
@@ -282,21 +283,11 @@ class TitleModuleEditable(TitleModule):
         self.base_module.date.config(cursor = "hand2")
         self.base_module.date.bind("<1>", self._click_date)
 
-        with Image.open(r".\common\tag_outlined.png") as image:
-            self.tag_icon_image = {
-                "standard": ImageTk.PhotoImage(image.resize((100, 100)))
-                }
-        with Image.open(r".\common\tag_outlined_hover.png") as image:
-            self.tag_icon_image.update({
-                "hover": ImageTk.PhotoImage(image.resize((100, 100)))
-                })
-
-        self.tag_icon = tk.Label(
-            self.master, image = self.tag_icon_image["standard"],
-            cursor = "hand2", bg = c.COLOUR_TRANSPARENT
+        self.tag_icon = HoverIconPath(
+            self.master, bg = c.COLOUR_TRANSPARENT, dimensions = (100, 100),
+            standard = r".\common\tag_outlined.png",
+            hover = r".\common\tag_outlined_hover.png"
             )
-        self.tag_icon.bind("<Enter>", self._enter_tag_icon)
-        self.tag_icon.bind("<Leave>", self._leave_tag_icon)
         self.tag_icon.bind("<1>", self._click_tag_icon)
         self.tag_icon.grid(row = 0, column = 2, **c.GRID_STICKY, padx = 20)
 
@@ -305,7 +296,6 @@ class TitleModuleEditable(TitleModule):
         self.tag_frame.grid(row = 1, column = 0, columnspan = c.COLUMNSPAN_ALL,
                             **c.GRID_STICKY, padx = 10, pady = 10)
 
-        self._tag_images = {}
         self._tag_widgets = {}
         self.tags = {}
         self.tag_dicts = {}
@@ -356,14 +346,6 @@ class TitleModuleEditable(TitleModule):
     def _click_tag_icon(self, event):
         """ Called when the tag icon image is left clicked """
         self.ask_tag()
-
-    @log_class
-    def _enter_tag_icon(self, *args):
-        self.tag_icon.config(image = self.tag_icon_image["hover"])
-
-    @log_class
-    def _leave_tag_icon(self, *args):
-        self.tag_icon.config(image = self.tag_icon_image["standard"])
 
     @log_class
     def ask_tag(self, *args):
@@ -427,22 +409,14 @@ class TitleModuleEditable(TitleModule):
         tag_img_hover = ImageTk.PhotoImage(
             image = tagf.text_tag(tag_string, height = 60, x_colour = "gray")
             )
-        self._tag_images[tag_col] = {"standard": tag_img,
-                                     "hover": tag_img_hover}
         # create labels
-        tag_widget = tk.Label(
-            self.tag_frame, image = tag_img, cursor = "hand2",
-            bg = c.COLOUR_TRANSPARENT
+        tag_widget = HoverIcon(
+            self.tag_frame, bg = c.COLOUR_TRANSPARENT,
+            standard = tag_img, hover = tag_img_hover
             )
         self._tag_widgets[tag_col] = tag_widget
 
         tag_widget.grid(row = 0, column = tag_col)
-        tag_widget.bind(
-            "<Enter>", lambda *args: self._enter_tag_widget(tag_col)
-            )
-        tag_widget.bind(
-            "<Leave>", lambda *args: self._leave_tag_widget(tag_col)
-            )
         tag_widget.bind(
             "<ButtonRelease-1>", lambda *args: self._click_tag_widget(tag_col)
             )
@@ -451,20 +425,6 @@ class TitleModuleEditable(TitleModule):
     def _increment_tag_count(self):
         """ Increase the tag count by one """
         self._tag_count += 1
-
-    @log_class
-    def _enter_tag_widget(self, column):
-        """ Set hover image on entering tag widget """
-        self._tag_widgets[column].config(
-            image = self._tag_images[column]["hover"]
-            )
-
-    @log_class
-    def _leave_tag_widget(self, column):
-        """ Set standard image on entering tag widget """
-        self._tag_widgets[column].config(
-            image = self._tag_images[column]["standard"]
-            )
 
     @log_class
     def _click_tag_widget(self, column):
