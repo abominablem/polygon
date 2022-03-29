@@ -434,8 +434,8 @@ class DownloadData(tk.Toplevel):
     def format_time(self, time: str) -> str:
         if time is None:
             return ""
-        time = time[:10]
         try:
+            time = time[:10]
             return datetime.strptime(time, "%Y-%m-%d").strftime("%d/%m/%Y")
         except:
             return time
@@ -858,6 +858,7 @@ class TvTracker(tk.Frame):
         self.download_window.bind("<<Import>>", self._download_click_import)
         self.download_window.start()
 
+    @log_class
     def _download_click_import(self, event = None):
         self._click_refresh()
         self.download_window.destroy()
