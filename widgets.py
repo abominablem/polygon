@@ -1099,6 +1099,16 @@ class HoverIconCross(HoverIcon):
                 tagf.x_image(height = height, colour = "gray")),
             **kwargs)
 
+class HoverIconTag(HoverIcon):
+    def __init__(self, master, value, height, **kwargs):
+        super().__init__(
+            master,
+            standard = ImageTk.PhotoImage(
+                image = tagf.text_tag(value, height = height)),
+            hover = ImageTk.PhotoImage(
+                image = tagf.text_tag(value, height = height,
+                                      x_colour = "gray")),
+            **kwargs)
 
 # test = "RatingDisplay"
 test = "TitleModule"

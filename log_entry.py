@@ -8,9 +8,8 @@ import sys
 sys.path.append("D:\\Users\\Marcus\\Documents\\R Documents\\Coding\\Python\\Packages")
 import tkinter as tk
 from tkinter import ttk, simpledialog
-from widgets import (TitleModule, HoverIcon, HoverIconTick, HoverIconCross,
-                     HoverIconPath)
-from PIL import Image, ImageTk
+from widgets import (TitleModule, HoverIconTick, HoverIconCross, HoverIconPath,
+                     HoverIconTag)
 import tkcalendar as tkcal
 from datetime import datetime
 
@@ -18,7 +17,6 @@ from mh_logging import log_class
 import tk_arrange as tka
 import constants as c
 import base
-import log_entry_tag as tagf
 from futil import get_tk
 
 log_class = log_class(c.LOG_LEVEL)
@@ -168,16 +166,8 @@ class TagSelection(tk.Toplevel):
     @log_class
     def get_tag_widget(self, value):
         """ Get Label widget containing a tag with given text """
-        # the standard image to show
-        tag_img = ImageTk.PhotoImage(image = tagf.text_tag(value, height = 40))
-        # the image to show when hovered over (darker cross)
-        tag_img_hover = ImageTk.PhotoImage(
-            image = tagf.text_tag(value, height = 40, x_colour = "gray"))
-
-        tag_widget = HoverIcon(
-            self, bg = c.COLOUR_TRANSPARENT, standard = tag_img,
-            hover = tag_img_hover
-            )
+        tag_widget = HoverIconTag(
+            self, bg = c.COLOUR_TRANSPARENT, value = value, height = 40)
         self._suggested_tags.append(tag_widget)
         tag_widget.tag_value = value
 
@@ -401,19 +391,10 @@ class TitleModuleEditable(TitleModule):
 
         tag_col = self.get_tag_count()
 
-        # the standard image to show
-        tag_img = ImageTk.PhotoImage(
-            image = tagf.text_tag(tag_string, height = 60)
-            )
-        # the image to show when hovered over (darker cross)
-        tag_img_hover = ImageTk.PhotoImage(
-            image = tagf.text_tag(tag_string, height = 60, x_colour = "gray")
-            )
         # create labels
-        tag_widget = HoverIcon(
-            self.tag_frame, bg = c.COLOUR_TRANSPARENT,
-            standard = tag_img, hover = tag_img_hover
-            )
+        tag_widget = HoverIconTag(
+            self.tag_frame, bg = c.COLOUR_TRANSPARENT, value = tag_string,
+            height = 60)
         self._tag_widgets[tag_col] = tag_widget
 
         tag_widget.grid(row = 0, column = tag_col)
