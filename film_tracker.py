@@ -17,7 +17,7 @@ import constants as c
 from futil import get_tk, format_time
 from imdb_functions import imdbf
 from widgets import (TitleModule, Counter, Padding, RangeDisplay, PolygonButton,
-                     RequestTitleWindow)
+                     RequestTitleWindow, HoverIconPath)
 from log_entry import LogEntryWindow
 
 log_class = log_class(c.LOG_LEVEL)
@@ -85,6 +85,13 @@ class FilmTracker(tk.Frame):
             self.header_frame, width = 200, height = c.DM_FILM_HEADER_HEIGHT
             )
 
+        self.watchlist_icon = HoverIconPath(
+            self.header_frame, bg = c.COLOUR_FILM_BACKGROUND, dimensions = (90, 90),
+            standard = r".\common\watchlist_outlined.png",
+            hover = r".\common\watchlist_outlined_hover.png"
+            )
+        self.watchlist_icon.bind("<1>", self._click_watchlist_icon)
+
         widgets = {1: {'widget': self.counter,
                        'grid_kwargs': {**c.GRID_STICKY, "padx": (30, 100)}},
                    2: {'widget': self.padding_left,
@@ -108,10 +115,12 @@ class FilmTracker(tk.Frame):
                    10: {'widget': self.padding_right,
                        'grid_kwargs': c.GRID_STICKY,
                        'stretch_width': True},
+                   11: {'widget': self.watchlist_icon,
+                       'grid_kwargs': {**c.GRID_STICKY, "padx": (0, 100)}},
                    }
 
         self.header = tka.WidgetSet(self.header_frame, widgets,
-                                    layout = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+                                    layout = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
         self.header.grid(row = 0, column = 0, **c.GRID_STICKY,
                          pady = (10, 20))
         self.header_frame.grid(row = 0, column = 0, **c.GRID_STICKY,
@@ -177,19 +186,20 @@ class FilmTracker(tk.Frame):
     @log_class
     def get_film_counts(self):
         """ Query the number of watched films and logged entries """
+        movie_types = "', '".join(c.MOVIE_TYPES)
         self.count_films = imdbf.db.entries.select(
             """ SELECT COUNT(DISTINCT e.title_id) FROM entries e INNER JOIN
             titles t ON e.title_id = t.title_id WHERE t.type IN
-            ('%s') """ % "', '".join(c.MOVIE_TYPES))[0][0]
+            ('%s') """ % movie_types)[0][0]
         self.count_entries = imdbf.db.entries.select(
             """ SELECT COUNT(*) FROM entries e INNER JOIN
             titles t ON e.title_id = t.title_id WHERE t.type IN
             ('%s') AND e.entry_date IS NOT NULL"""
-            % "', '".join(c.MOVIE_TYPES))[0][0]
+            % movie_types)[0][0]
         self.total_runtime = int(imdbf.db.entries.select(
             """ SELECT SUM(t.runtime) FROM entries e LEFT JOIN titles t
             ON e.title_id = t.title_id WHERE t.type IN ('%s') """
-            % "', '".join(c.MOVIE_TYPES))[0][0])
+            % movie_types)[0][0])
 
     @log_class
     def set_counter_range(self):
@@ -375,6 +385,10 @@ class FilmTracker(tk.Frame):
     @log_class
     def _unbind_configure(self, *args, **kwargs):
         self.unbind("<Configure>", self._configure_binding)
+
+    @log_class
+    def _click_watchlist_icon(self, *args, **kwargs):
+        print("watchlist icon clicked")
 
     @log_class
     def create_titlemods(self):
