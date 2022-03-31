@@ -209,6 +209,8 @@ class RatingDisplay(tk.Text):
         return self.font.measure(self.get('0.1', 'end').strip())
 
 class TitleModuleBase(tk.Frame):
+    """ Bordered frame containing Date, Title, Original title, Director, Year,
+    and Runtime """
     def __init__(self, master, **kwargs):
         super().__init__(master, **kwargs)
 
@@ -316,15 +318,15 @@ class TitleModuleBase(tk.Frame):
         return datetime.strptime(date, "%Y-%m-%d").strftime("%d %b %Y")
 
 class TitleModule(tk.Frame):
-    """ Bordered frame containing Date, Title, Original title, Director, Year,
-    Runtime, and Rating """
+    """ Bordered frame containing TitleModuleBase data and Rating. Optional
+    number to left and rewatch indicator to right"""
     @log_class
     def __init__(self, master, include_rewatch = True, include_number = True,
                  **kwargs):
         self.master = master
         super().__init__(self.master, **kwargs)
 
-        font_rating = ("GNU Unifont", 36, "bold")
+        font_rating = ("Calibri", 36, "bold")
         font_rewatch = ("Calibri", 36)
         font_number = ("Calibri", 36)
 
@@ -412,6 +414,109 @@ class TitleModule(tk.Frame):
 
             else:
                 self.__dict__[kw].config(text = kwargs[kw])
+
+class TitleModuleDetailed(TitleModule):
+    """ Bordered frame containing TitleModule data, plot tag, and an arbitrary
+    number of other tags. Optional number to left."""
+    def __init__(self, master, include_number = True, include_rewatch = True,
+                 **kwargs):
+        super().__init__(master, include_number = include_number,
+                         include_rewatch = True, **kwargs)
+
+        self.plot_tag = tk.Text(
+            self.border_frame.inner, font = ("Calibri", 24), padx = 10, pady = 10,
+            state = tk.DISABLED, fg = "black", bg = "white", wrap = tk.WORD,
+            relief = "flat", height = 2
+            )
+        self.plot_tag.grid(row = 1, column = 0, columnspan = c.COLUMNSPAN_ALL,
+                            **c.GRID_STICKY)
+
+        " Frame for all tag widgets "
+        self.tag_frame = tk.Frame(self, bg = c.COLOUR_FILM_BACKGROUND)
+        self.tag_widgets = []
+        self.tag_frame_components = {}
+
+        self.tag_frame.grid(row = 1, column = 1, **c.GRID_STICKY)
+
+        self._value_dict = {
+            "title": None, "original_title": None, "director": None,
+            "year": None, "runtime": None, "date": None, "rating": None,
+            "rewatch": None, "number": None, "plot_tag": None
+            }
+
+    @log_class
+    def _place_tag_frame_component(self, y):
+        self.tag_frame_components[y].grid(row = y, column = 0, **c.GRID_STICKY)
+
+    @log_class
+    def create_tag_widgets(self, tags):
+        max_width = self.tag_frame.winfo_width()
+        if max_width <= 1:
+            max_width = 1600
+        x, y = 0, 0
+        self.tag_frame_components = {
+            0: tk.Frame(self.tag_frame, bg = c.COLOUR_FILM_BACKGROUND)}
+
+        self._place_tag_frame_component(0)
+
+        for tag_name in tags:
+            for tag_value in tags[tag_name]:
+                if not tag_name is None:
+                    text = "%s: %s" % (tag_name, tag_value)
+                else:
+                    text = tag_value
+
+                " Get the dimensions of the tag image "
+                _w, width, height = tagf.text_tag(
+                    text, height = 40, dimensions = True)
+
+                "Add tags to one line until it is full, then create a new line"
+                if x + width > max_width and x != 0:
+                    y += 1
+                    self.tag_frame_components[y] = tk.Frame(
+                        self.tag_frame, bg = c.COLOUR_FILM_BACKGROUND)
+                    self._place_tag_frame_component(y)
+                    x = 0
+
+                widget = HoverIconTag(self.tag_frame_components[y],
+                                      value = text, height = 40,
+                                      bg = c.COLOUR_FILM_BACKGROUND)
+                widget.tag_width, widget.tag_height = width, height
+                widget.tag_name, widget.tag_value = tag_name, tag_value
+
+                self.tag_widgets.append(widget)
+                widget.grid(row = 0, column = x, columnspan = width,
+                            **c.GRID_STICKY)
+                x += width
+
+    @log_class
+    def replace_tag_widgets(self, event = None):
+        self.remove_tag_widgets()
+        self.create_tag_widgets(self._value_dict["tags"])
+
+    @log_class
+    def remove_tag_widgets(self):
+        for widget in self.tag_widgets:
+            widget.grid_forget()
+
+        for widget in self.tag_frame_components.values():
+            widget.grid_forget()
+
+    @log_class
+    def set_text(self, **kwargs):
+        self._value_dict.update(kwargs)
+        for kw in kwargs:
+            if kw  == "plot_tag":
+                self.plot_tag.config(state = tk.NORMAL)
+                self.plot_tag.delete(0.0, "end")
+                self.plot_tag.insert(0.0, kwargs[kw])
+                self.plot_tag.config(state = tk.DISABLED)
+            elif kw == "tags":
+                self.remove_tag_widgets()
+                self.create_tag_widgets(kwargs[kw])
+            else:
+                super().set_text(**{kw: kwargs[kw]})
+#TODO
 
 class Counter(tk.Frame):
     @log_class
@@ -1160,14 +1265,18 @@ if __name__ == "__main__":
             number = 1
             )
         title.grid(row = 0, column = 0, sticky = "nesw")
-        title = TitleModule(root, bg = "black", pady = 30)
-        title.set_text(
-            date = "2022-01-22", title = "Those Magnificent Men in Their Flying Machines or How I Flew from London to Paris in 25 hours 11 minutes",
-            director = "director", original_title = "abcdefghijklmnopqrstuvwxyz",
-            year = 2021, runtime = "165", rating = 10, rewatch = False,
-            number = 2
-            )
-        title.grid(row = 1, column = 0, sticky = "nesw")
+
+        for y in range(5):
+            title = TitleModuleDetailed(root, bg = "black", pady = 30)
+            title.set_text(
+                date = "2022-01-22", title = "Those Magnificent Men in Their Flying Machines or How I Flew from London to Paris in 25 hours 11 minutes",
+                director = "director", original_title = "abcdefghijklmnopqrstuvwxyz",
+                year = 2021, runtime = "165", rating = 10, rewatch = False,
+                number = 2, plot_tag = "Hoping to push Britain to the forefront of aviation, a London publisher organizes an international air race across the English Channel, but must contend with two entrants vying for his daughter, as well as national rivalries and cheating.",
+                tags = imdbf.get_tags('tt2953050')
+                )
+            title.grid(row = y, column = 0, sticky = "nesw")
+        root.bind("<Return>", title.replace_tag_widgets)
         root.rowconfigure(0, weight = 1)
         root.rowconfigure(1, weight = 1)
         root.columnconfigure(0, weight = 1)
