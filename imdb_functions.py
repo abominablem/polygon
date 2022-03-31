@@ -623,6 +623,7 @@ class IMDbFunctions:
 
     @log_class
     def get_title(self, title_id, refresh = False, get_episodes = False):
+        """ Get Title object for an id """
         title = self.titles.get(title_id, refresh, get_episodes)
         if title.type in c.EPISODE_TYPES:
             if not hasattr(title, 'series_id'):
@@ -631,7 +632,13 @@ class IMDbFunctions:
         return title
 
     @log_class
+    def get_tags(self, title_id):
+        return self.title_tags.get_dict(title_id)
+
+    @log_class
     def get_series_with_entries(self, title_id, refresh):
+        """ Get Title object for a series, with an Entry object for each
+        episode """
         series = self.get_series(title_id, refresh = refresh, get_episodes = True)
         for episode in series.episodes:
             episode.entry = Entry(episode.title_id)
@@ -836,6 +843,22 @@ class IMDbTitleTagsFunctions:
                 self.add(title_id, tag_value, tag_name)
 
     @log_class
+    def get_dict(self, title_id):
+        tags = self.db.filter(
+            filters = {"title_id": title_id},
+            return_cols = ["tag_name", "tag_value"], rc = "columns"
+            )
+        names = tags["tag_name"]
+        values = tags["tag_value"]
+        tag_dict = {}
+
+        for i, name in enumerate(names):
+            tag_dict.setdefault(name, [])
+            tag_dict[name].append(values[i])
+
+        return tag_dict
+
+    @log_class
     def add(self, title_id, tag_value, tag_name = None):
         # tags should never be duplicated
         if self.exists(title_id, tag_value, tag_name):
@@ -863,7 +886,7 @@ class IMDbEntryTagsFunctions:
         self.db = base.polygon_db.entry_tags
 
     @log_class
-    def add_dict(self,entry_id, tag_dict):
+    def add_dict(self, entry_id, tag_dict):
         for tag_name, tags in tag_dict.items():
             if not isinstance(tags, list):
                 tags = [tags]
@@ -1030,4 +1053,4 @@ class IMDbWatchlistFunctions(IMDbBaseTitleFunctions):
 imdbf = IMDbFunctions()
 
 if __name__ == "__main__":
-    pass
+    print(imdbf.get_tags('tt1640680'))
