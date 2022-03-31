@@ -9,7 +9,6 @@ import sys
 sys.path.append("D:\\Users\\Marcus\\Documents\\R Documents\\Coding\\Python\\Packages")
 from PIL_util import pad_image_with_transparency
 
-
 def circle(draw, center, radius, fill):
     coords = (center[0] - radius + 1, center[1] - radius + 1,
               center[0] + radius - 1, center[1] + radius - 1)
@@ -88,7 +87,7 @@ def _text_tag(text, text_colour = "black", x_colour = "black", fill = "black",
               font = font_remove, fill = x_colour)
     return image
 
-def text_tag(text, height = 300, **kwargs):
+def text_tag(text, height = 300, dimensions = False, **kwargs):
     """ Return an image of a tag shaped object containing a given text string
     and X, fixing a given height and varying the width based on the length of
     the string """
@@ -98,7 +97,10 @@ def text_tag(text, height = 300, **kwargs):
     width = int(height * aspect)
     image = image.resize((width, height), resample = Image.ANTIALIAS)
     image = force_opacity(image)
-    return image
+    if dimensions:
+        return (image, width, height)
+    else:
+        return image
 
 def x_image(height, colour = "black", background = (0, 0, 0, 0),
             bordercolour = "white"):
