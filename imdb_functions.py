@@ -569,7 +569,7 @@ class IMDbFunctions:
             SELECT e.entry_date as [date], COALESCE(t.custom_title, t.title)
             AS title, t.original_title, t.director, t.year, t.runtime, e.rating,
             e.rewatch,
-            RANK() OVER(ORDER BY [entry_date] DESC, entry_order DESC) AS [rank]
+            RANK() OVER(ORDER BY entry_date DESC, entry_order DESC) AS [rank]
             FROM entries e LEFT JOIN titles t
             ON e.title_id = t.title_id
             %s
@@ -668,6 +668,52 @@ class IMDbFunctions:
     @log_class
     def get_entry(self, title_id):
         return Entry(title_id)
+
+    @log_class
+    def get_all_title_tags(self):
+        results = base.polygon_db.title_tags.select(
+            "SELECT title_id, tag_name, tag_value FROM title_tags")
+        tags_dict = {}
+        for row in results:
+            title_id, tag_name, tag_value = row
+            tags_dict.setdefault(title_id, {})
+            tags_dict[title_id].setdefault(tag_name, [])
+            tags_dict[title_id][tag_name].append(tag_value)
+        return tags_dict
+
+
+    @log_class
+    def get_watchlist(self, filters = None):
+        """ Get data for all titles on the watchlist not yet watched, including
+        title tags """
+        db = base.polygon_db.watchlist
+        if filters is None:
+            where = "WHERE e.title_id IS NULL"
+        else:
+            where = "(%s) AND e.title_id IS NULL" % db._get_where(filters)
+
+        query = """
+            SELECT w.title_id, t.title, t.original_title, t.director,
+                t.year, t.runtime, t.imdb_user_rating, t.plot_tag, w.log_date
+            FROM watchlist w
+            LEFT JOIN titles t
+            ON w.title_id = t.title_id
+            LEFT JOIN entries e
+            ON w.title_id = e.title_id
+            %s
+            ORDER BY w.log_date, t.title
+            """ % where
+        results = db.select(query)
+        cols = ["title_id", "title", "original_title", "director", "year",
+                "runtime", "rating", "plot_tag", "date"]
+        tags_dict = self.get_all_title_tags()
+        results_dict = {}
+        for index, row in enumerate(results):
+            row_dict = {cols[i]: val for i, val in enumerate(row)}
+            row_dict["number"] = index
+            row_dict["tags"] = tags_dict[row_dict["title_id"]]
+            results_dict[index] = row_dict
+        return results_dict
 
     @log_class
     def title_is_unreleased(self, title_id):
@@ -1053,4 +1099,7 @@ class IMDbWatchlistFunctions(IMDbBaseTitleFunctions):
 imdbf = IMDbFunctions()
 
 if __name__ == "__main__":
-    print(imdbf.get_tags('tt1640680'))
+    pass
+    # e = imdbf.get_all_title_tags()
+    # e = imdbf.get_watchlist()
+    # imdbf.add_to_watchlist('tt1805322')
