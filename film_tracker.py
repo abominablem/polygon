@@ -17,7 +17,7 @@ import constants as c
 from futil import get_tk, format_time
 from imdb_functions import imdbf
 from widgets import (TitleModule, Counter, Padding, RangeDisplay, PolygonButton,
-                     RequestTitleWindow, HoverIconPath)
+                     RequestTitleWindow, HoverIconPath, TitleModuleDetailed)
 from log_entry import LogEntryWindow
 
 log_class = log_class(c.LOG_LEVEL)
@@ -432,6 +432,60 @@ class FilmTracker(tk.Frame):
         del self.title_modules[index]
 
 
+class Watchlist(tk.Frame):
+    @log_class
+    def __init__(self, master, *args, **kwargs):
+        super().__init__(master, *args, **kwargs)
+        self.window = get_tk(self)
+
+        self.get_watchlist_data()
+
+        """ Create TitleModuleDetailed instances """
+        self.titlemod_frame = tk.Frame(
+            self, bg = c.COLOUR_FILM_BACKGROUND
+            )
+        self.titlemod_frame.grid(row = 1, column = 0, **c.GRID_STICKY)
+        self.titlemod_frame.columnconfigure(0, weight = 1)
+        self.title_modules = {}
+        for i in range(3):
+            self.add_title_module()
+        # self.set_counter_range()
+        self.set_title_text()
+
+        pass
+
+    @log_class
+    def get_watchlist_data(self, event = None):
+        self.watchlist_data = imdbf.get_watchlist()
+
+    @log_class
+    def count_title_modules(self):
+        """ Get the number of title modules currently displayed """
+        return len(self.title_modules)
+
+    @log_class
+    def add_title_module(self):
+        """ Add a new title module to the end """
+        i = self.count_title_modules()
+        tm = TitleModuleDetailed(
+            self.titlemod_frame, bg = c.COLOUR_FILM_BACKGROUND, padx = 10,
+            pady = 20
+            )
+        self.title_modules[i] = tm
+        tm.grid(row = i, column = 0, **c.GRID_STICKY)
+
+    @log_class
+    def set_title_text(self):
+        """ Set the text of the title modules based on the current displayed
+        range """
+        entries = self.watchlist_data
+        ranks = range(3)
+        for order, rank in enumerate(ranks):
+            mod_dict = entries[rank]
+            del mod_dict["title_id"]
+            self.title_modules[order].set_text(**mod_dict, rewatch = False)
+
+
 if __name__ == "__main__":
     root = tk.Tk()
     style = ttk.Style()
@@ -439,6 +493,7 @@ if __name__ == "__main__":
     root.configure(bg = c.COLOUR_FILM_BACKGROUND, pady = 30)
     # root.overrideredirect(True)
     root.columnconfigure(0, weight = 1)
-    ft = FilmTracker(root, bg = c.COLOUR_FILM_BACKGROUND)
+    # ft = FilmTracker(root, bg = c.COLOUR_FILM_BACKGROUND)
+    ft = Watchlist(root, bg = c.COLOUR_FILM_BACKGROUND)
     ft.grid(row = 0, column = 0, **c.GRID_STICKY)
     root.mainloop()
