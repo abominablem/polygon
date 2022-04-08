@@ -315,6 +315,7 @@ class TitleModuleBase(tk.Frame):
 
     @log_class
     def format_date(self, date):
+        date = date[:10]
         return datetime.strptime(date, "%Y-%m-%d").strftime("%d %b %Y")
 
 class TitleModule(tk.Frame):
@@ -435,6 +436,7 @@ class TitleModuleDetailed(TitleModule):
         self.tag_frame = tk.Frame(self, bg = c.COLOUR_FILM_BACKGROUND)
         self.tag_widgets = []
         self.tag_frame_components = {}
+        self._images = []
 
         self.tag_frame.grid(row = 1, column = 1, **c.GRID_STICKY)
 
@@ -445,11 +447,18 @@ class TitleModuleDetailed(TitleModule):
             }
 
     @log_class
+    def size_plot_tag(self):
+        self.plot_tag.update()
+        line_count = self.plot_tag.count('1.0', 'end', 'displaylines')
+        self.plot_tag.config(height = line_count)
+
+    @log_class
     def _place_tag_frame_component(self, y):
         self.tag_frame_components[y].grid(row = y, column = 0, **c.GRID_STICKY)
 
     @log_class
     def create_tag_widgets(self, tags):
+        """ Rewrite so tag image created as block? """
         max_width = self.tag_frame.winfo_width()
         if max_width <= 1:
             max_width = 1600
@@ -461,13 +470,16 @@ class TitleModuleDetailed(TitleModule):
 
         for tag_name in tags:
             for tag_value in tags[tag_name]:
+                if not tag_name in ["director", "genre"]:
+                    continue
+
                 if not tag_name is None:
                     text = "%s: %s" % (tag_name, tag_value)
                 else:
                     text = tag_value
 
-                " Get the dimensions of the tag image "
-                _w, width, height = tagf.text_tag(
+                "Get the dimensions of the tag image"
+                image, width, height = tagf.text_tag(
                     text, height = 40, dimensions = True)
 
                 "Add tags to one line until it is full, then create a new line"
@@ -478,9 +490,10 @@ class TitleModuleDetailed(TitleModule):
                     self._place_tag_frame_component(y)
                     x = 0
 
-                widget = HoverIconTag(self.tag_frame_components[y],
-                                      value = text, height = 40,
-                                      bg = c.COLOUR_FILM_BACKGROUND)
+                image = ImageTk.PhotoImage(image = image)
+                widget = tk.Label(self.tag_frame_components[y],
+                                  image = image, bg = c.COLOUR_FILM_BACKGROUND)
+                widget.image = image
                 widget.tag_width, widget.tag_height = width, height
                 widget.tag_name, widget.tag_value = tag_name, tag_value
 
@@ -497,10 +510,14 @@ class TitleModuleDetailed(TitleModule):
     @log_class
     def remove_tag_widgets(self):
         for widget in self.tag_widgets:
-            widget.grid_forget()
+            widget.grid_remove()
+        del self.tag_widgets
+        self.tag_widgets = []
 
         for widget in self.tag_frame_components.values():
-            widget.grid_forget()
+            widget.grid_remove()
+        del self.tag_frame_components
+        self.tag_frame_components = {}
 
     @log_class
     def set_text(self, **kwargs):
@@ -508,15 +525,18 @@ class TitleModuleDetailed(TitleModule):
         for kw in kwargs:
             if kw  == "plot_tag":
                 self.plot_tag.config(state = tk.NORMAL)
+
                 self.plot_tag.delete(0.0, "end")
                 self.plot_tag.insert(0.0, kwargs[kw])
+                self.size_plot_tag()
+
                 self.plot_tag.config(state = tk.DISABLED)
+
             elif kw == "tags":
                 self.remove_tag_widgets()
                 self.create_tag_widgets(kwargs[kw])
             else:
                 super().set_text(**{kw: kwargs[kw]})
-#TODO
 
 class Counter(tk.Frame):
     @log_class
@@ -554,8 +574,15 @@ class Counter(tk.Frame):
 
     @log_class
     def set_counter(self, count):
-        self.counter.config(text = count)
+        if re.match("^\d+$", str(count)):
+            self.counter.config(text = self._add_commas(count))
+        else:
+            self.counter.config(text = count)
+
         self.fit_text()
+
+    def _add_commas(self, count):
+        return "{:,}".format(count)
 
     @log_class
     def set_icon(self, type):
@@ -1266,16 +1293,15 @@ if __name__ == "__main__":
             )
         title.grid(row = 0, column = 0, sticky = "nesw")
 
-        for y in range(5):
-            title = TitleModuleDetailed(root, bg = "black", pady = 30)
-            title.set_text(
-                date = "2022-01-22", title = "Those Magnificent Men in Their Flying Machines or How I Flew from London to Paris in 25 hours 11 minutes",
-                director = "director", original_title = "abcdefghijklmnopqrstuvwxyz",
-                year = 2021, runtime = "165", rating = 10, rewatch = False,
-                number = 2, plot_tag = "Hoping to push Britain to the forefront of aviation, a London publisher organizes an international air race across the English Channel, but must contend with two entrants vying for his daughter, as well as national rivalries and cheating.",
-                tags = imdbf.get_tags('tt2953050')
-                )
-            title.grid(row = y, column = 0, sticky = "nesw")
+        title = TitleModuleDetailed(root, bg = "black", pady = 30)
+        title.set_text(
+            date = "2022-01-22", title = "Those Magnificent Men in Their Flying Machines or How I Flew from London to Paris in 25 hours 11 minutes",
+            director = "director", original_title = "abcdefghijklmnopqrstuvwxyz",
+            year = 2021, runtime = "165", rating = 10, rewatch = False,
+            number = 2, plot_tag = "Hoping to push Britain to the forefront of aviation, a London publisher organizes an international air race across the English Channel, but must contend with two entrants vying for his daughter, as well as national rivalries and cheating.",
+            tags = imdbf.get_tags('tt2953050')
+            )
+        title.grid(row = 1, column = 0, sticky = "nesw")
         root.bind("<Return>", title.replace_tag_widgets)
         root.rowconfigure(0, weight = 1)
         root.rowconfigure(1, weight = 1)
