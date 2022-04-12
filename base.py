@@ -15,6 +15,8 @@ from PIL_util import pad_image_with_transparency
 from sqlite_tablecon import MultiConnection
 import constants as c
 
+from datetime import datetime
+
 log_class = log_class(c.LOG_LEVEL)
 
 class PolygonException(Exception):
@@ -194,6 +196,211 @@ class TrimmedFrame(tk.Frame):
         self.inner.columnconfigure(0, weight = 1)
         self.inner.rowconfigure(0, weight = 1)
 
+class WidgetCollection(tk.Frame):
+    """ Organised collection of a dynamic set of widget instances """
+    @log_class
+    def __init__(self, master, unit_widget, minmax = None, wkwargs = None,
+                 orientation = "vertical", expand = "both", **kwargs):
+
+        self.set_minmax(minmax)
+        if not orientation in ["vertical", "horizontal"]:
+            raise ValueError("Argument 'orientation' must be either vertical "
+                             "or horizontal")
+        if not expand in ["both", "row", "column"]:
+            raise ValueError("Argument 'expand' must be either row, column, "
+                             "or both")
+        self._w_kwargs = {} if wkwargs is None else wkwargs
+        self._w_orientation = {"vertical": "v", "horizontal": "h"}[orientation]
+        self._w_widget = unit_widget
+        self._w_expand = expand
+
+        self._widget_list = []
+        self._widget_dict = {}
+
+        super().__init__(master, **kwargs)
+
+        self._add_widget()
+        self._create_widgets()
+
+        self._configure_binding = {}
+        self._last_configured = datetime.min
+        self.bind_configure(self)
+
+    @log_class
+    def set_minmax(self, minmax = None):
+        """ Set the minimum and maximum number of widgets """
+        if minmax is None:
+            self._w_count_min, self._w_count_max = (0, float('inf'))
+        else:
+            min, max = minmax
+            min = 0 if min is None else min
+            max = float('inf') if max is None else max
+            self._w_count_min, self._w_count_max = (min, max)
+
+    @log_class
+    def _add_widget(self):
+        """ Add an instance of the widget to the end of the collection """
+        widget = self._w_widget(self, **self._w_kwargs)
+        index = self.count()
+        self._widget_list.append(widget)
+        self._widget_dict[index] = widget
+        self._place_widget(widget, index)
+
+    @log_class
+    def _remove_widget(self, index = None):
+        """ Remove a specific widget, defaulting to the last one """
+        if index is None:
+            index = self.count() - 1
+        widget = self._widget_dict[index]
+        widget.grid_forget()
+        self._widget_list.remove(widget)
+        del self._widget_dict[index]
+
+    @log_class
+    def _place_widget(self, widget, index):
+        if self._w_orientation == "v":
+            widget.grid(row = index, column = 0, **c.GRID_STICKY)
+        if self._w_orientation == "h":
+            widget.grid(row = 0, column = index, **c.GRID_STICKY)
+
+        self._handle_expand(index)
+
+    @log_class
+    def _handle_expand(self, index):
+        if self._w_orientation == "v":
+            idict = {"row": index, "column": 0}
+        elif self._w_orientation == "h":
+            idict = {"row": 0, "column": index}
+        else:
+            raise ValueError
+
+        if self._w_expand in ["row", "both"]:
+            self.rowconfigure(idict["row"], weight = 1)
+
+        if self._w_expand in ["column", "both"]:
+            self.columnconfigure(idict["column"], weight = 1)
+
+    @log_class
+    def get_widgets(self):
+        """ Return a list of widgets, ordered by placement top to bottom / left
+        to right """
+        return self._widget_list
+
+    @log_class
+    def get_widgets_dict(self):
+        """ Return a dictionary of widgets with keys the index of their
+        placement in the collection """
+        return self._widget_dict
+
+    @log_class
+    def count(self):
+        """ Return the number of currently placed widgets """
+        return len(self._widget_list)
+
+    @log_class
+    def get_available_height(self):
+        """ Get space available for widgets to be added """
+        return self.winfo_height()
+
+    @log_class
+    def _get_max_widgets(self):
+        """ Get maximum number of widgets that will fit based on available
+        space. """
+        #TODO - horizontal placement
+        widget_height = self._widget_list[0].winfo_height()
+        available_height = self.get_available_height()
+        if available_height == 0:
+            return 0
+        else:
+            return available_height // widget_height
+
+    @log_class
+    def allow_configure(self, bln):
+        """ Allow automatic placement/removal of widgets triggered by the
+        <Configure> event """
+        self._allow_configure = bln
+
+    @log_class
+    def bind_configure(self, widget = None):
+        """ Bind the automatic placement/removal of widgets to the <Configure>
+        event of a specific function. If no widget is given, rebind all widgets
+        previously bound. """
+        if widget is None:
+            for wdgt in self._configure_binding:
+                self._bind_configure(wdgt)
+        else:
+            self._bind_configure(widget)
+
+    @log_class
+    def _bind_configure(self, widget):
+        if not self._configure_binding.get(widget, None) is None:
+            # don't bind again if one already exists
+            return
+        binding = widget.bind("<Configure>", self._configure, add = "+")
+        self._configure_binding[widget] = binding
+
+    @log_class
+    def unbind_configure(self, widget = None):
+        """ Unbind the automatic placement/removal of widgets from the
+        <Configure> event of a specific function. If no widget is given,
+        unbind all widgets currently bound. """
+        if widget is None:
+            for wdgt in self._configure_binding:
+                self._unbind_configure(wdgt)
+        else:
+            self._unbind_configure(widget)
+
+    @log_class
+    def _unbind_configure(self, widget):
+        binding = self._configure_binding[widget]
+        if binding is None:
+            return
+        widget.unbind("<Configure>", binding)
+        self._configure_binding[widget] = None
+
+    @log_class
+    def _configure(self, *args, **kwargs):
+        """ Called when <Configure> event is triggered. """
+        if not self._allow_configure:
+            return
+        if (datetime.now() - self._last_configured).total_seconds() < 0.1:
+            return
+        # Temporarily unbind and then rebind the configure callback to prevent
+        # infinite loops from creating widgets inside this function
+        self.unbind_configure()
+        self._last_configured = datetime.now()
+        if self._create_widgets():
+            self.event_generate("<<CountChange>>")
+        self.bind_configure()
+
+    @log_class
+    def _create_widgets(self):
+        """ Add or remove widgets based on the current number, available space,
+        and restrictions. Generate virtual event and return True if the number
+        of widgets has changed """
+        max_widgets = min(max(self._get_max_widgets(),
+                              self._w_count_min),
+                          self._w_count_max)
+        num_widgets = self.count()
+        create = False
+        # add new title modules until max number is reached
+        if num_widgets < max_widgets:
+            for i in range(max_widgets - num_widgets):
+                self._add_widget()
+            create = True
+        elif num_widgets == max_widgets:
+            create = False
+        # or remove until max number is reached
+        else:
+            removals = [i for i in self._widget_dict if i+1 > max_widgets]
+            for i in removals:
+                self._remove_widget(i)
+            create = len(removals) > 0
+
+        if create:
+            self.event_generate("<<CountChange>>")
+        return create
+
 polygon_db = MultiConnection(
     r".\data\polygon.db",
     ["series", "episodes", "titles", "entries", "entry_tags", "title_tags",
@@ -210,7 +417,7 @@ if __name__ == "__main__":
                 self.root, text = "btn1",
                 command = self.start_window,
                 font = ("Constantia", 32, "bold"))
-            btn_start_rec.grid(row = 1, column = 0)
+            btn_start_rec.grid(row = 1, column = 0, **c.GRID_STICKY)
 
             self.root.mainloop()
 
@@ -220,7 +427,7 @@ if __name__ == "__main__":
             btn_stop_rec = tk.Button(
                 title_bar.window, text = "btn2",
                 font = ("Constantia", 32, "bold"))
-            btn_stop_rec.grid(row = 1, column = 0)
+            btn_stop_rec.grid(row = 1, column = 0, **c.GRID_STICKY)
             title_bar.start()
 
     app = TestApp()

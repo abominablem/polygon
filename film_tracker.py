@@ -16,6 +16,7 @@ import tk_arrange as tka
 import constants as c
 from futil import get_tk, format_time
 from imdb_functions import imdbf
+from base import WidgetCollection
 from widgets import (TitleModule, Counter, Padding, RangeDisplay, PolygonButton,
                      RequestTitleWindow, HoverIconPath, TitleModuleDetailed)
 from log_entry import LogEntryWindow
@@ -131,19 +132,18 @@ class FilmTracker(tk.Frame):
         self.query_data()
 
         """ Create TitleModules """
-        self.titlemod_frame = tk.Frame(
-            self, bg = c.COLOUR_FILM_BACKGROUND
+        self.titlemods = WidgetCollection(
+            self, bg = c.COLOUR_FILM_BACKGROUND, unit_widget = TitleModule,
+            minmax = (c.INT_FILM_TITLES, None), expand = "column",
+            wkwargs = dict(
+                bg = c.COLOUR_FILM_BACKGROUND, padx = 10, pady = 20),
             )
-        self.titlemod_frame.grid(row = 1, column = 0, **c.GRID_STICKY)
-        self.titlemod_frame.columnconfigure(0, weight = 1)
-        self.title_modules = {}
-        for i in range(c.INT_FILM_TITLES):
-            self.add_title_module()
+        self.titlemods.allow_configure(False)
+        self.titlemods.bind("<<CountChange>>", self.update_title_modules)
+        self.titlemods.grid(row = 1, column = 0, **c.GRID_STICKY)
+
         self.set_counter_range()
         self.set_title_text()
-
-        self._last_configured = datetime.min
-        self._bind_configure()
 
         # allow time for widgets to be placed and settle before formally
         # ending startup
@@ -152,6 +152,8 @@ class FilmTracker(tk.Frame):
     @log_class
     def end_startup(self, *args, **kwargs):
         self._during_startup = False
+        self.titlemods.allow_configure(True)
+        self.titlemods.set_minmax((1, None))
 
     @log_class
     def query_data(self):
@@ -206,7 +208,7 @@ class FilmTracker(tk.Frame):
         """ Set the counter range based on the current values and the number
         of title modules displayed """
         lower = self.range_display.lower
-        num_titlemods = len(self.title_modules)
+        num_titlemods = self.titlemods.count()
         self.range_display.mindiff = num_titlemods - 1
         self.range_display.set_range(lower, lower + num_titlemods - 1)
 
@@ -220,14 +222,15 @@ class FilmTracker(tk.Frame):
             entries = self.ranked_entries
 
         ranks = self.range_display.get_range()
+        widgets = self.titlemods.get_widgets()
         for order, rank in enumerate(ranks):
             try:
-                self.title_modules[order].set_text(**entries[rank])
+                widgets[order].set_text(**entries[rank])
             except:
-                self.title_modules[order].set_text(rewatch = False)
+                widgets[order].set_text(rewatch = False)
 
     @log_class
-    def update_title_modules(self):
+    def update_title_modules(self, *args):
         """ Update the text of all displayed title modules """
         self.set_counter_range()
         self.set_title_text()
@@ -306,22 +309,17 @@ class FilmTracker(tk.Frame):
         self.set_counter()
 
     @log_class
-    def count_title_modules(self):
-        """ Get the number of title modules currently displayed """
-        return len(self.title_modules)
-
-    @log_class
     def deincrement(self, *args, **kwargs):
         """ Increment the range display so that the previous set of titles is
         displayed """
-        self.range_display.increment(-1*self.count_title_modules())
+        self.range_display.increment(-1*self.titlemods.count())
         self.update_title_modules()
 
     @log_class
     def increment(self, *args, **kwargs):
         """ Increment the range display so that the next set of titles is
         displayed """
-        self.range_display.increment(self.count_title_modules())
+        self.range_display.increment(self.titlemods.count())
         self.update_title_modules()
 
     @log_class
@@ -340,96 +338,8 @@ class FilmTracker(tk.Frame):
         self.update_title_modules()
 
     @log_class
-    def get_available_height(self):
-        """ Get space available for title modules to be added """
-        window_height = self.winfo_height()
-        header_height = self.header.master.winfo_height()
-        return window_height - header_height
-
-    @log_class
-    def _get_max_titlemods(self):
-        """ Get maximum number of title mods that will fit based on available
-        space. If called during startup, return the defined constant
-        default. """
-        if self._during_startup:
-            return c.INT_FILM_TITLES
-        else:
-            titlemod_height = self.title_modules[0].winfo_height()
-            available_height = self.get_available_height()
-            if available_height == 0:
-                return 0
-            else:
-                return available_height // titlemod_height
-
-    @log_class
-    def _configure(self, *args, **kwargs):
-        """ Called when <Configure> event is triggered. """
-        if (datetime.now() - self._last_configured).total_seconds() < 0.1:
-            return
-        if self._during_startup:
-            return
-        # Temporarily unbind and then rebind the configure callback to prevent
-        # infinite loops from creating widgets inside this function
-        self._unbind_configure()
-        self._last_configured = datetime.now()
-        if self.create_titlemods():
-            self.update_title_modules()
-        self._bind_configure()
-
-    @log_class
-    def _bind_configure(self, *args, **kwargs):
-        self._configure_binding = self.bind(
-            "<Configure>", self._configure
-            )
-
-    @log_class
-    def _unbind_configure(self, *args, **kwargs):
-        self.unbind("<Configure>", self._configure_binding)
-
-    @log_class
     def _click_watchlist_icon(self, *args, **kwargs):
         print("watchlist icon clicked")
-
-    @log_class
-    def create_titlemods(self):
-        """ Add or remove title modules based on the current number and
-        available space. Return True if the number of title modules has
-        changed """
-        # Always keep at least 1 title mod present
-        max_titlemods = max(self._get_max_titlemods(), 1)
-        num_titlemods = self.count_title_modules()
-        # add new title modules until max number is reached
-        if num_titlemods < max_titlemods:
-            for i in range(max_titlemods - num_titlemods):
-                self.add_title_module()
-            return True
-        elif num_titlemods == max_titlemods:
-            return False
-        # or remove until max number is reached
-        else:
-            removals = [i for i in self.title_modules if i+1 >= num_titlemods]
-            for i in removals:
-                self.remove_title_module(i)
-            return True
-
-    @log_class
-    def add_title_module(self):
-        """ Add a new title module to the end """
-        i = self.count_title_modules()
-        tm = TitleModule(
-            self.titlemod_frame, bg = c.COLOUR_FILM_BACKGROUND, padx = 10,
-            pady = 20
-            )
-        self.title_modules[i] = tm
-        tm.grid(row = i, column = 0, **c.GRID_STICKY)
-
-    @log_class
-    def remove_title_module(self, index = None):
-        """ Remove a specific TitleModule, defaulting to the last one """
-        if index is None:
-            index = max(self.title_modules)
-        self.title_modules[index].grid_forget()
-        del self.title_modules[index]
 
 
 class Watchlist(tk.Frame):
@@ -441,11 +351,11 @@ class Watchlist(tk.Frame):
         self.get_watchlist_data()
 
         """ Create TitleModuleDetailed instances """
-        self.titlemod_frame = tk.Frame(
+        self.titlemods = tk.Frame(
             self, bg = c.COLOUR_FILM_BACKGROUND
             )
-        self.titlemod_frame.grid(row = 1, column = 0, **c.GRID_STICKY)
-        self.titlemod_frame.columnconfigure(0, weight = 1)
+        self.titlemods.grid(row = 1, column = 0, **c.GRID_STICKY)
+        self.titlemods.columnconfigure(0, weight = 1)
         self.title_modules = {}
         for i in range(3):
             self.add_title_module()
@@ -468,7 +378,7 @@ class Watchlist(tk.Frame):
         """ Add a new title module to the end """
         i = self.count_title_modules()
         tm = TitleModuleDetailed(
-            self.titlemod_frame, bg = c.COLOUR_FILM_BACKGROUND, padx = 10,
+            self.titlemods, bg = c.COLOUR_FILM_BACKGROUND, padx = 10,
             pady = 20
             )
         self.title_modules[i] = tm
@@ -493,7 +403,8 @@ if __name__ == "__main__":
     root.configure(bg = c.COLOUR_FILM_BACKGROUND, pady = 30)
     # root.overrideredirect(True)
     root.columnconfigure(0, weight = 1)
-    # ft = FilmTracker(root, bg = c.COLOUR_FILM_BACKGROUND)
-    ft = Watchlist(root, bg = c.COLOUR_FILM_BACKGROUND)
+    root.rowconfigure(0, weight = 1)
+    ft = FilmTracker(root, bg = c.COLOUR_FILM_BACKGROUND)
+    # ft = Watchlist(root, bg = c.COLOUR_FILM_BACKGROUND)
     ft.grid(row = 0, column = 0, **c.GRID_STICKY)
     root.mainloop()
