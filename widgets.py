@@ -624,8 +624,8 @@ class RangeDisplay(tk.Frame):
         and with Y - X always >= mindiff (if given) """
         super().__init__(master, *args, **kwargs)
 
-        self.minimum = -9223372036854775807 if minimum is None else minimum
-        self.maximum = 9223372036854775807 if maximum is None else maximum
+        self.minimum = float('-inf') if minimum is None else minimum
+        self.maximum = float('inf') if maximum is None else maximum
         self.mindiff = mindiff
 
         self.columnconfigure(0, weight = 1)
