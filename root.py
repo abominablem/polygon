@@ -57,6 +57,10 @@ class Polygon(tk.Tk):
             self.widget_frame, bg = c.COLOUR_FILM_BACKGROUND
             )
 
+        self.icons["film"].bind(
+            "<1>", lambda event: self.film_tracker.set_titlemod_mode("entries")
+            )
+
         widgets = {1: {'widget': self.header,
                        'grid_kwargs': c.GRID_STICKY,
                        'stretch_width': True},

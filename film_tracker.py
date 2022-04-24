@@ -129,18 +129,30 @@ class FilmTracker(tk.Frame):
         self.header_frame.columnconfigure(0, weight = 1)
 
         """ Get data from database """
+        self.titlemod_mode = "entries"
         self.query_data()
 
         """ Create TitleModules """
-        self.titlemods = WidgetCollection(
+        self.titlemods_entries = WidgetCollection(
             self, bg = c.COLOUR_FILM_BACKGROUND, unit_widget = TitleModule,
             minmax = (c.INT_FILM_TITLES, None), expand = "column",
             wkwargs = dict(
                 bg = c.COLOUR_FILM_BACKGROUND, padx = 10, pady = 20),
             )
-        self.titlemods.allow_configure(False)
-        self.titlemods.bind("<<CountChange>>", self.update_title_modules)
-        self.titlemods.grid(row = 1, column = 0, **c.GRID_STICKY)
+        self.titlemods_entries.bind(
+            "<<CountChange>>", self.update_title_modules)
+
+        self.titlemods_watchlist = WidgetCollection(
+            self, bg = c.COLOUR_FILM_BACKGROUND, expand = "column",
+            unit_widget = TitleModuleDetailed,
+            minmax = (c.INT_FILM_TITLES_WATCHLIST, None),
+            wkwargs = dict(
+                bg = c.COLOUR_FILM_BACKGROUND, padx = 10, pady = 10),
+            )
+        self.titlemods_watchlist.bind(
+            "<<CountChange>>", self.update_title_modules)
+
+        self.set_titlemod_mode("entries")
 
         self.set_counter_range()
         self.set_title_text()
@@ -148,6 +160,25 @@ class FilmTracker(tk.Frame):
         # allow time for widgets to be placed and settle before formally
         # ending startup
         self.after(1000, self.end_startup)
+
+    @log_class
+    def set_titlemod_mode(self, mode):
+        self.titlemod_mode = mode
+        titlemods = {"entries": self.titlemods_entries,
+                     "watchlist": self.titlemods_watchlist}
+        for dict_mode, titlemod in titlemods.items():
+            if dict_mode == mode:
+                self.titlemods = titlemod
+                titlemod.allow_configure(True)
+                titlemod.grid(row = 1, column = 0, **c.GRID_STICKY)
+            else:
+                titlemod.allow_configure(False)
+                titlemod.grid_forget()
+
+        self.set_range_display_maximum()
+        self.set_counter_range()
+        self.set_title_text()
+        self.event_generate("<<TitlemodModeChange>>")
 
     @log_class
     def end_startup(self, *args, **kwargs):
@@ -159,8 +190,9 @@ class FilmTracker(tk.Frame):
     def query_data(self):
         self.get_ranked_entries()
         self.get_film_counts()
-        self.range_display.set_maximum(max(self.ranked_entries))
+        self.set_range_display_maximum()
         self.counter.set_counter(self.count_films)
+        self.watchlist_data = imdbf.get_watchlist()
 
     @log_class
     def set_counter(self):
@@ -216,7 +248,9 @@ class FilmTracker(tk.Frame):
     def set_title_text(self):
         """ Set the text of the title modules based on the current displayed
         range """
-        if self.btn_toggle_rewatch.toggle_on:
+        if self.titlemod_mode == "watchlist":
+            entries = self.watchlist_data
+        elif self.btn_toggle_rewatch.toggle_on:
             entries = self.ranked_entries_rewatches
         else:
             entries = self.ranked_entries
@@ -290,12 +324,18 @@ class FilmTracker(tk.Frame):
         self.set_title_text()
 
     @log_class
-    def toggle_rewatch(self, *args, **kwargs):
-        """ Toggle whether to include rewatches in the diary/counter or not """
-        if self.btn_toggle_rewatch.toggle_on:
+    def set_range_display_maximum(self, event = None):
+        if self.titlemod_mode == "watchlist":
+            self.range_display.set_maximum(max(self.watchlist_data))
+        elif self.btn_toggle_rewatch.toggle_on:
             self.range_display.set_maximum(max(self.ranked_entries_rewatches))
         else:
             self.range_display.set_maximum(max(self.ranked_entries))
+
+    @log_class
+    def toggle_rewatch(self, *args, **kwargs):
+        """ Toggle whether to include rewatches in the diary/counter or not """
+        self.set_range_display_maximum()
         self.set_counter()
         self.update_title_modules()
 
@@ -331,7 +371,9 @@ class FilmTracker(tk.Frame):
     @log_class
     def increment_all(self, *args, **kwargs):
         """ Increment the range display as far as possible """
-        if self.btn_toggle_rewatch.toggle_on:
+        if self.titlemod_mode == "watchlist":
+            self.range_display.increment(max(self.watchlist_data))
+        elif self.btn_toggle_rewatch.toggle_on:
             self.range_display.increment(self.count_entries)
         else:
             self.range_display.increment(self.count_films)
@@ -339,62 +381,7 @@ class FilmTracker(tk.Frame):
 
     @log_class
     def _click_watchlist_icon(self, *args, **kwargs):
-        print("watchlist icon clicked")
-
-
-class Watchlist(tk.Frame):
-    @log_class
-    def __init__(self, master, *args, **kwargs):
-        super().__init__(master, *args, **kwargs)
-        self.window = get_tk(self)
-
-        self.get_watchlist_data()
-
-        """ Create TitleModuleDetailed instances """
-        self.titlemods = tk.Frame(
-            self, bg = c.COLOUR_FILM_BACKGROUND
-            )
-        self.titlemods.grid(row = 1, column = 0, **c.GRID_STICKY)
-        self.titlemods.columnconfigure(0, weight = 1)
-        self.title_modules = {}
-        for i in range(3):
-            self.add_title_module()
-        # self.set_counter_range()
-        self.set_title_text()
-
-        pass
-
-    @log_class
-    def get_watchlist_data(self, event = None):
-        self.watchlist_data = imdbf.get_watchlist()
-
-    @log_class
-    def count_title_modules(self):
-        """ Get the number of title modules currently displayed """
-        return len(self.title_modules)
-
-    @log_class
-    def add_title_module(self):
-        """ Add a new title module to the end """
-        i = self.count_title_modules()
-        tm = TitleModuleDetailed(
-            self.titlemods, bg = c.COLOUR_FILM_BACKGROUND, padx = 10,
-            pady = 20
-            )
-        self.title_modules[i] = tm
-        tm.grid(row = i, column = 0, **c.GRID_STICKY)
-
-    @log_class
-    def set_title_text(self):
-        """ Set the text of the title modules based on the current displayed
-        range """
-        entries = self.watchlist_data
-        ranks = range(3)
-        for order, rank in enumerate(ranks):
-            mod_dict = entries[rank]
-            del mod_dict["title_id"]
-            self.title_modules[order].set_text(**mod_dict, rewatch = False)
-
+        self.set_titlemod_mode("watchlist")
 
 if __name__ == "__main__":
     root = tk.Tk()
@@ -405,6 +392,5 @@ if __name__ == "__main__":
     root.columnconfigure(0, weight = 1)
     root.rowconfigure(0, weight = 1)
     ft = FilmTracker(root, bg = c.COLOUR_FILM_BACKGROUND)
-    # ft = Watchlist(root, bg = c.COLOUR_FILM_BACKGROUND)
     ft.grid(row = 0, column = 0, **c.GRID_STICKY)
     root.mainloop()
