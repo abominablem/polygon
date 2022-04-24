@@ -223,6 +223,7 @@ class WidgetCollection(tk.Frame):
         self._create_widgets()
 
         self._configure_binding = {}
+        self._allow_configure = True
         self._last_configured = datetime.min
         self.bind_configure(self)
 
@@ -400,6 +401,9 @@ class WidgetCollection(tk.Frame):
         if create:
             self.event_generate("<<CountChange>>")
         return create
+
+    def __getitem__(self, index):
+        return self.get_widgets()[index]
 
 polygon_db = MultiConnection(
     r".\data\polygon.db",
