@@ -304,7 +304,10 @@ class TitleModuleBase(tk.Frame):
                 self.date.config(text = self.format_date(kwargs[kw]))
 
             else:
-                self.__dict__[kw].config(text = kwargs[kw])
+                try:
+                    self.__dict__[kw].config(text = kwargs[kw])
+                except (KeyError, AttributeError):
+                    self.__dict__[kw] = kwargs[kw]
 
     @log_class
     def format_runtime(self, runtime):
@@ -414,7 +417,10 @@ class TitleModule(tk.Frame):
                 self.__dict__[kw].config(text = kwargs[kw])
 
             else:
-                self.__dict__[kw].config(text = kwargs[kw])
+                try:
+                    self.__dict__[kw].config(text = kwargs[kw])
+                except (KeyError, AttributeError):
+                    self.__dict__[kw] = kwargs[kw]
 
 class TitleModuleDetailed(TitleModule):
     """ Bordered frame containing TitleModule data, plot tag, and an arbitrary
