@@ -125,3 +125,5 @@ testing.py
 archive/tv_classes.py
 archive/tv_tracker v1.py
 *.db
+*.xml
+*.iml
