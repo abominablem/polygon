@@ -25,11 +25,12 @@ class PolygonException(Exception):
 class PolygonFrameBase:
     """ Base tk.Frame with menu, Polygon logo, and title bar """
     @log_class
-    def __init__(self, master, title = "Polygon"):
+    def __init__(self, master, title = "Polygon", logo = None, **kwargs):
         self.master = master
         self.widget_frame = tk.Frame(self.master, bg = c.COLOUR_BACKGROUND)
         """ Draw logo"""
-        with Image.open(c.LOGO_PATH) as image:
+        logo = c.LOGO_PATH if logo is None else logo
+        with Image.open(logo) as image:
             self.img_logo = ImageTk.PhotoImage(image.resize((145, 145)))
             self.img_logo_padded = ImageTk.PhotoImage(
                 pad_image_with_transparency(
@@ -124,6 +125,9 @@ class IconSet(tk.Frame):
         if name is None:
             name = text
 
+        if name in self.icons:
+            raise ValueError("Name already used within icon set")
+
         icon = tk.Label(self, text = text, **kwargs)
         column = len(self.icons)
 
@@ -139,37 +143,55 @@ class IconSet(tk.Frame):
         # update the foreground colour when hovering over the icon
         if not hover is None:
             self._icon_colours[name]['hover'] = hover
-            def enter_func(event):
-                w = event.widget
-                self._icon_colours[w.name]["current"] = w.cget('fg')
-                w.config(fg = self._icon_colours[w.name]["hover"])
-
-            def leave_func(event):
-                w = event.widget
-                w.config(fg = self._icon_colours[w.name]["current"])
-
-            icon.bind("<Enter>", enter_func)
-            icon.bind("<Leave>", leave_func)
+            icon.bind("<Enter>", self._bound_enter_func)
+            icon.bind("<Leave>", self._bound_leave_func)
 
         # update the foreground colour when the icon is the last one clicked
         if not select is None:
             self._icon_colours[name]['select'] = select
-            def click_func(event):
-                w = event.widget
-                for icon in self.icons:
-                    if icon != w.name:
-                        self[icon].config(fg = self._icon_colours[icon]['fg'])
-                col = self._icon_colours[w.name]["select"]
-                self._icon_colours[w.name]["current"] = col
-                w.config(fg = col)
-
-            icon.bind("<1>", click_func)
+            icon.bind("<1>", self._bound_click_func)
 
         self.icons[name] = icon
         return icon
 
+    @log_class
+    def _bound_enter_func(self, event):
+        """ Bound to the <Enter> event of each icon """
+        w = event.widget
+        self._icon_colours[w.name]["current"] = w.cget('fg')
+        w.config(fg = self._icon_colours[w.name]["hover"])
+
+    @log_class
+    def _bound_leave_func(self, event):
+        """ Bound to the <Leave> event of each icon """
+        w = event.widget
+        w.config(fg = self._icon_colours[w.name]["current"])
+
+    @log_class
+    def _bound_click_func(self, event):
+        """ Bound to the <1> event of each icon """
+        w = event.widget
+        for iname in self.icons:
+            if iname != w.name:
+                self[iname].config(fg = self._icon_colours[iname]['fg'])
+        col = self._icon_colours[w.name]["select"]
+        self._icon_colours[w.name]["current"] = col
+        w.config(fg = col)
+
+    @log_class
+    def select(self, name):
+        """ Simulate selecting an icon """
+        event = IconDummyEvent(widget = self.icons[name])
+        self._bound_click_func(event)
+
     def __getitem__(self, name):
         return self.icons[name]
+
+class IconDummyEvent:
+    """ Dummy class used to hold some specific attributes, simulating a tk
+    event """
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
 
 class TrimmedFrame(tk.Frame):
     @log_class
