@@ -453,6 +453,10 @@ class FolderSelection(tk.Frame):
         self.selectors[row] = FolderSelector(
             self, text = text, name = name, row = row)
 
+    def get_value(self):
+        return {selector.name: selector.get_value()
+                for selector in self.selectors}
+
     def __getitem__(self, name):
         try:
             return self.selectors[name]
