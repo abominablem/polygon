@@ -6,6 +6,7 @@ Created on Thu Jan  6 20:24:28 2022
 """
 import sys
 sys.path.append("D:\\Users\\Marcus\\Documents\\R Documents\\Coding\\Python\\Packages")
+import tkinter.filedialog
 import tkinter as tk
 from PIL import Image, ImageTk
 
@@ -427,6 +428,79 @@ class WidgetCollection(tk.Frame):
     def __getitem__(self, index):
         return self.get_widgets()[index]
 
+class FolderSelection(tk.Frame):
+    def __init__(self, master, text = None, name = None, **kwargs):
+        super().__init__(master, **kwargs)
+        self.selectors = {
+            0: FolderSelector(self, text = text, name = name, row = 0)
+            }
+        self.columnconfigure(1, weight = 1)
+
+    def config_entry(self, **kwargs):
+        for selector in self.selectors.values():
+            selector.config_entry(**kwargs)
+
+    def config_button(self, **kwargs):
+        for selector in self.selectors.values():
+            selector.config_button(**kwargs)
+
+    def config_text(self, **kwargs):
+        for selector in self.selectors.values():
+            selector.config_text(**kwargs)
+
+    def add_selector(self, text = None, name = None):
+        row = max(self.selectors) + 1
+        self.selectors[row] = FolderSelector(
+            self, text = text, name = name, row = row)
+
+    def __getitem__(self, name):
+        try:
+            return self.selectors[name]
+        except KeyError:
+            for fs in self.selectors.values():
+                if fs == name: return fs
+
+class FolderSelector:
+    def __init__(self, master, text = None, name = None, row = 0):
+        " If specified, create a text label in the first column "
+        self._text = text
+        self.name = row if name is None else name
+        if not text is None:
+            self.text = tk.Label(master, text = text)
+
+        sv = tk.StringVar()
+        sv.trace_add("write", self._entry_write)
+        self.entry = tk.Entry(master, textvariable = sv)
+        self.button = tk.Button(
+            master, text = "Update directory", command = self._button_click)
+
+        self.text.grid(row = row, column = 0, **c.GRID_STICKY)
+        self.entry.grid(row = row, column = 1, **c.GRID_STICKY)
+        self.button.grid(row = row, column = 2, **c.GRID_STICKY)
+
+    def get_value(self):
+        value = self.value
+        if not value[-1] == "/":
+            value += "/"
+        return value
+
+    def _entry_write(self, *args, **kwargs):
+        self.value = self.entry.cget('sv').get()
+
+    def _button_click(self, *args, **kwargs):
+        self.value = tk.filedialog.askdirectory(title = 'Select a directory')
+        self.entry.delete(0, "end")
+        self.entry.insert(0, self.value)
+
+    def config_entry(self, **kwargs):
+        self.entry.config(**kwargs)
+
+    def config_button(self, **kwargs):
+        self.button.config(**kwargs)
+
+    def config_text(self, **kwargs):
+        self.text.config(**kwargs)
+
 polygon_db = MultiConnection(
     r".\data\polygon.db",
     ["series", "episodes", "titles", "entries", "entry_tags", "title_tags",
@@ -456,4 +530,14 @@ if __name__ == "__main__":
             btn_stop_rec.grid(row = 1, column = 0, **c.GRID_STICKY)
             title_bar.start()
 
-    app = TestApp()
+    class TestAppFolderSelection:
+        @log_class
+        def __init__(self):
+            self.root = tk.Tk()
+            btn_start_rec = FolderSelection(self.root, text = "Input directory", name = "input", bg = "orange")
+            btn_start_rec.add_selector("Output directory", name = "output")
+            self.root.columnconfigure(0, weight = 1)
+            btn_start_rec.grid(row = 1, column = 0, **c.GRID_STICKY)
+            self.root.mainloop()
+
+    app = TestAppFolderSelection()
