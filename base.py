@@ -15,6 +15,7 @@ import tk_arrange as tka
 from PIL_util import pad_image_with_transparency
 from sqlite_tablecon import MultiConnection
 import constants as c
+import prospero.constants as pr_c
 
 from datetime import datetime
 
@@ -448,7 +449,7 @@ class FolderSelection(tk.Frame):
         for selector in self.selectors.values():
             selector.config_text(**kwargs)
 
-    def add_selector(self, text = None, name = None):
+    def add(self, text = None, name = None):
         row = max(self.selectors) + 1
         self.selectors[row] = FolderSelector(
             self, text = text, name = name, row = row)
@@ -462,11 +463,13 @@ class FolderSelection(tk.Frame):
             return self.selectors[name]
         except KeyError:
             for fs in self.selectors.values():
-                if fs == name: return fs
+                if fs.name == name: return fs
+        raise ValueError("No selector %s" % name)
 
 class FolderSelector:
     def __init__(self, master, text = None, name = None, row = 0):
         " If specified, create a text label in the first column "
+        self.master = master
         self._text = text
         self.name = row if name is None else name
         if not text is None:
@@ -478,9 +481,9 @@ class FolderSelector:
         self.button = tk.Button(
             master, text = "Update directory", command = self._button_click)
 
-        self.text.grid(row = row, column = 0, **c.GRID_STICKY)
-        self.entry.grid(row = row, column = 1, **c.GRID_STICKY)
-        self.button.grid(row = row, column = 2, **c.GRID_STICKY)
+        self.text.grid(row = row, column = 0, **c.GRID_STICKY_PADDING_SMALL)
+        self.entry.grid(row = row, column = 1, **c.GRID_STICKY_PADDING_SMALL)
+        self.button.grid(row = row, column = 2, **c.GRID_STICKY_PADDING_SMALL)
 
     def get_value(self):
         value = self.value
@@ -488,13 +491,18 @@ class FolderSelector:
             value += "/"
         return value
 
-    def _entry_write(self, *args, **kwargs):
-        self.value = self.entry.cget('sv').get()
-
-    def _button_click(self, *args, **kwargs):
-        self.value = tk.filedialog.askdirectory(title = 'Select a directory')
+    def set_value(self, value):
+        self.value = value
         self.entry.delete(0, "end")
         self.entry.insert(0, self.value)
+        self.master.event_generate("<<ValueChange>>")
+
+    def _entry_write(self, *args, **kwargs):
+        self.set_value(self.entry.cget('sv').get())
+
+    def _button_click(self, *args, **kwargs):
+        value = tk.filedialog.askdirectory(title = 'Select a directory')
+        self.set_value(value)
 
     def config_entry(self, **kwargs):
         self.entry.config(**kwargs)
@@ -505,10 +513,29 @@ class FolderSelector:
     def config_text(self, **kwargs):
         self.text.config(**kwargs)
 
+class ProsperoIOSelector(FolderSelection):
+    def __init__(self, master, **kwargs):
+        super().__init__(
+            master, text = "Input directory", name = "input", **kwargs)
+        self.add(text = "Output directory", name = "output")
+        self.config_text(**pr_c.PR_LABEL_STANDARD_ARGS)
+        self.config_entry(**pr_c.PR_ENTRY_LARGE_ARGS)
+        for selector in self.selectors.values():
+            selector.config_button(
+                **pr_c.PR_BUTTON_LIGHT_STANDARD_ARGS,
+                text = "Change %s directory" % selector.name
+                )
+
 polygon_db = MultiConnection(
     r".\data\polygon.db",
     ["series", "episodes", "titles", "entries", "entry_tags", "title_tags",
      "watchlist"],
+    debug = c.DEBUG
+    )
+
+prospero_db = MultiConnection(
+    r".\prospero\data\prospero.db",
+    ["config", "renames"],
     debug = c.DEBUG
     )
 
