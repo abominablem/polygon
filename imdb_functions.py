@@ -1077,7 +1077,7 @@ class Entry:
 
 
 class IMDbWatchlistFunctions(IMDbBaseTitleFunctions):
-    """ Container for functions relating to the Titles table """
+    """ Container for functions relating to the Watchlist table """
     @log_class
     def __init__(self):
         super().__init__()
@@ -1100,6 +1100,4 @@ imdbf = IMDbFunctions()
 
 if __name__ == "__main__":
     pass
-    # e = imdbf.get_all_title_tags()
-    # e = imdbf.get_watchlist()
-    # imdbf.add_to_watchlist('tt1805322')
+    # imdbf.add_to_watchlist('tt0053925')

@@ -127,3 +127,4 @@ archive/tv_tracker v1.py
 *.db
 *.xml
 *.iml
+*.json
