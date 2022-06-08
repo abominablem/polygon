@@ -37,21 +37,15 @@ class Polygon(tk.Tk):
         self.icons.rowconfigure(0, weight = 1)
 
         icon_kwargs = dict(
-            bg = c.COLOUR_TITLEBAR, font = ("Calibri", 50),
+            bg = c.COLOUR_TITLEBAR,
             padx = 20, anchor = "center", fg = c.COLOUR_TITLEBAR_ICON,
             cursor = "hand2", hover = c.COLOUR_TITLEBAR_ICON_HOVER,
             select = c.COLOUR_TITLEBAR_ICON_SELECTED
             )
-        budget_icon_kwargs = {k:v for k, v in icon_kwargs.items()}
-        budget_icon_kwargs["font"] = ("Century", 50, "bold")
-
-        prospero_icon_kwargs = {k:v for k, v in icon_kwargs.items()}
-        prospero_icon_kwargs["font"] = ("Calibri", 45)
-
-        self.icons.add(text = "🌊", name = "prospero", **prospero_icon_kwargs)
-        self.icons.add(text = "£", name = "budget", **budget_icon_kwargs)
-        self.icons.add(text = "📺", name = "tv", **icon_kwargs)
-        self.icons.add(text = "🎞", name = "film", **icon_kwargs)
+        self.icons.add(text = "🌊", name = "prospero", **icon_kwargs, font = ("Calibri", 45))
+        self.icons.add(text = "£", name = "budget", **icon_kwargs, font = ("Century", 50, "bold"))
+        self.icons.add(text = "📺", name = "tv", **icon_kwargs, font = ("Calibri", 45))
+        self.icons.add(text = "🎞", name = "film", **icon_kwargs, font = ("Calibri", 50))
         for name in ["film", "tv", "budget", "prospero"]:
             self.icons[name].bind(
                 "<1>", lambda event: self.launch_module(event.widget.name),
