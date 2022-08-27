@@ -537,6 +537,7 @@ class IMDbFunctions:
             pass
         elif type == "movie":
             inner_filters.append("type IN ('%s')" % "', '".join(c.MOVIE_TYPES))
+            inner_filters.append("runtime >= 45")
         else:
             raise ValueError("Invalid type")
 
@@ -1100,4 +1101,5 @@ imdbf = IMDbFunctions()
 
 if __name__ == "__main__":
     pass
-    # imdbf.add_to_watchlist('tt0053925')
+    # imdbf.add_to_watchlist('tt1454029')
+    # imdbf.add_entry('tt0800080', {'platform': 'Download'}, rating = 6)
