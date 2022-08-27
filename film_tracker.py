@@ -224,15 +224,16 @@ class FilmTracker(tk.Frame):
         self.count_films = imdbf.db.entries.select(
             """ SELECT COUNT(DISTINCT e.title_id) FROM entries e INNER JOIN
             titles t ON e.title_id = t.title_id WHERE t.type IN
-            ('%s') """ % movie_types)[0][0]
+            ('%s') AND t.runtime >= 45""" % movie_types)[0][0]
         self.count_entries = imdbf.db.entries.select(
             """ SELECT COUNT(*) FROM entries e INNER JOIN
             titles t ON e.title_id = t.title_id WHERE t.type IN
-            ('%s') AND e.entry_date IS NOT NULL"""
+            ('%s') AND t.runtime >= 45 AND e.entry_date IS NOT NULL"""
             % movie_types)[0][0]
         self.total_runtime = int(imdbf.db.entries.select(
             """ SELECT SUM(t.runtime) FROM entries e LEFT JOIN titles t
-            ON e.title_id = t.title_id WHERE t.type IN ('%s') """
+            ON e.title_id = t.title_id WHERE t.type IN ('%s')
+            AND t.runtime >= 45 """
             % movie_types)[0][0])
 
     @log_class
