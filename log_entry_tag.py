@@ -7,7 +7,6 @@ Created on Sat Feb  5 23:30:08 2022
 from PIL import Image, ImageDraw, ImageFont
 import sys
 sys.path.append("D:\\Users\\Marcus\\Documents\\R Documents\\Coding\\Python\\Packages")
-from PIL_util import pad_image_with_transparency
 
 def circle(draw, center, radius, fill):
     coords = (center[0] - radius + 1, center[1] - radius + 1,
