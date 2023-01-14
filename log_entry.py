@@ -185,7 +185,7 @@ class TagSelection(tk.Toplevel):
     @log_class
     def get_tag_names(self):
         """ Get list of distinct tag names already used """
-        names = list({tag[0] for tag in self.current_tags})
+        names = list({tag[0] for tag in self.current_tags if tag[0] is not None})
 
         return sorted(names)
 
