@@ -12,6 +12,7 @@ from widgets import (TitleModule, HoverIconTick, HoverIconCross, HoverIconPath,
                      HoverIconTag)
 import tkcalendar as tkcal
 from datetime import datetime
+import re
 
 from mh_logging import log_class
 import tk_arrange as tka
@@ -60,6 +61,8 @@ class TagSelection(tk.Toplevel):
 
         self.tag_name = tk.StringVar(self.widget_frame.inner)
         self.tag_value = tk.StringVar(self.widget_frame.inner)
+        self.tag_value.trace_add("write", self.filter_tags_on_entry)
+        self._last_entry_write = datetime.min
 
         self.current_tags = self.get_tag_combinations()
         self.current_tag_names = self.get_tag_names()
@@ -123,7 +126,13 @@ class TagSelection(tk.Toplevel):
 
     @log_class
     def get_tag_combinations(self):
-        query = "SELECT DISTINCT tag_name, tag_value FROM entry_tags"
+        """ Get all unique tag name and value combinations, sorted
+        by most recently used to least recently used. entry_id is used as a
+        good-enough proxy for entry_date. """
+
+        query = """ SELECT tag_name, tag_value FROM entry_tags
+                    GROUP BY tag_name, tag_value
+                    ORDER BY MAX(entry_id) DESC """
         result = base.polygon_db.entry_tags.select(query)
         return result
 
@@ -133,16 +142,9 @@ class TagSelection(tk.Toplevel):
 
     @log_class
     def get_latest_tag_values(self, name, n = 5):
-        """ Get the set of n most recently used values for a tag name """
-        query = """SELECT DISTINCT tag_value FROM
-            entry_tags t LEFT JOIN entries e
-            ON t.[entry_id] = e.entry_id
-            WHERE tag_name = '%s'
-            GROUP BY tag_value
-            ORDER BY MAX(entry_date) DESC
-            LIMIT %s""" % (name, n)
-        result = base.polygon_db.entry_tags.select(query)
-        return [row[0] for row in result]
+        """ Get the top n most recently used tag values for a given tag
+        name """
+        return self.get_tag_values(name)[:n]
 
     @log_class
     def clear_suggested_tags(self):
@@ -155,9 +157,14 @@ class TagSelection(tk.Toplevel):
 
     @log_class
     def add_tag_suggestions(self, name):
-        """ Add tag suggestion images below the window for a given tag name """
+        """ Get and add tag suggestions for a given tag name """
         values = self.get_latest_tag_values(name)
+        self.add_tags(values)
 
+
+    @log_class
+    def add_tags(self, values):
+        """ Add tag images below the window for a list of tag values """
         for value in values:
             tag_col = self.get_tag_count()
             tag = self.get_tag_widget(value)
@@ -186,14 +193,13 @@ class TagSelection(tk.Toplevel):
     def get_tag_names(self):
         """ Get list of distinct tag names already used """
         names = list({tag[0] for tag in self.current_tags if tag[0] is not None})
-
         return sorted(names)
 
     @log_class
     def get_tag_values(self, name):
         """ Get list of distinct tag values already used in association with
-        a certain tag name """
-        names = list({tag[1] for tag in self.current_tags if tag[0] == name})
+        a certain tag name, sorted in order of most recently used to least """
+        names = [tag[1] for tag in self.current_tags if tag[0] == name]
         return names
 
     @log_class
@@ -203,9 +209,17 @@ class TagSelection(tk.Toplevel):
         return {name: value}
 
     @log_class
-    def get_dict(self):
+    def get_dict(self, get_from = "actual"):
         tag = self.get_tag()
-        return {"name": list(tag)[0], "value": list(tag.values())[0]}
+        if get_from == "actual":
+            tag_dict = {"name": list(tag)[0], "value": list(tag.values())[0]}
+        elif get_from == "first_suggested":
+            tag_wdgt = self._suggested_tags[0]
+            tag_dict = {"name": list(tag)[0], "value": tag_wdgt.tag_value}
+        else:
+            raise ValueError("Invalid value of get_from specified. Must be "
+                             "one of 'actual' or 'first_suggested'")
+        return tag_dict
 
     @log_class
     def ask_new_tag_name(self):
@@ -214,6 +228,34 @@ class TagSelection(tk.Toplevel):
             )
         self.tag_name.set(name)
         self.tag_value_entry.focus_force()
+
+    @log_class
+    def _tag_value_write(self, *args, **kwargs):
+        """ Callback from the write event of tag_value """
+        self._last_entry_write = datetime.now()
+        self.after(500, self.filter_tags_on_entry)
+
+    @log_class
+    def filter_tags_on_entry(self, *args, **kwargs):
+        """ Filter the suggested tags based on what has been typed so far """
+        # Updates after 0.5 seconds of no write activity
+        if (datetime.now()-self._last_entry_write).total_seconds() < 0.5:
+            return
+        tag_dict = self.get_dict()
+
+        current_values = self.get_tag_values(tag_dict["name"])
+        matched_values = []
+        # RegEx expression to match any string which contains each word in the
+        # tag value (in any order, parts of words allowed)
+        regex_expr = "^(?=.*" + ")(?=.*".join(tag_dict["value"].split())+").*$"
+        # Return the first 5 values matched
+        for value in current_values:
+            if (re.match(regex_expr, value, re.IGNORECASE)
+                and len(matched_values) < 5):
+                matched_values.append(value)
+
+        self.clear_suggested_tags()
+        self.add_tags(matched_values)
 
     @log_class
     def _click_x(self, *args):
@@ -343,7 +385,14 @@ class TitleModuleEditable(TitleModule):
         self.tag_window = TagSelection(
             self.master, bg = c.COLOUR_TRANSPARENT)
         self.tag_window.lift()
-        self.tag_window.bind("<Return>", self.get_tag)
+        self.tag_window.bind(
+            "<Return>",
+            lambda *args, **kwargs: self.get_tag(get_from = "actual")
+            )
+        self.tag_window.bind(
+            "<Shift-Return>",
+            lambda *args, **kwargs: self.get_tag(get_from = "first_suggested")
+            )
         self.tag_window.bind("<<TickClick>>", self.get_tag)
         self.tag_window.start(position = self.get_tag_startup_position())
 
@@ -354,9 +403,9 @@ class TitleModuleEditable(TitleModule):
         return (x, y)
 
     @log_class
-    def get_tag(self, *args):
+    def get_tag(self, *args, get_from = "actual"):
         """ Get the tag details from the open tag window, and then close it """
-        tag_dict = self.tag_window.get_dict()
+        tag_dict = self.tag_window.get_dict(get_from = get_from)
         if not (tag_dict["value"] is None or tag_dict["value"] == ""):
             self.add_tag(**tag_dict)
         self.tag_window.destroy()
