@@ -535,7 +535,7 @@ polygon_db = MultiConnection(
 
 prospero_db = MultiConnection(
     r".\prospero\data\prospero.db",
-    ["config", "renames"],
+    ["config", "renames", "regex_patterns"],
     debug = c.DEBUG
     )
 
