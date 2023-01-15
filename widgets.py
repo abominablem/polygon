@@ -27,7 +27,8 @@ import log_entry_tag as tagf
 log_class = log_class(c.LOG_LEVEL)
 
 class RatingDisplay(tk.Text):
-    """ Display a rating out of N stars """
+    """ Display a rating out of N stars, with rollover selection and colours
+    that depend on the displayed rating. """
     @log_class
     def __init__(self, master, min_rating = 1, max_rating = 10, **kwargs):
 
@@ -189,6 +190,7 @@ class RatingDisplay(tk.Text):
 
     @log_class
     def get_mouseover_rating(self, event):
+        """ Get the star rating currently under the cursor """
         x = event.x
         text_width = self._get_current_width()
         widget_width = self.winfo_width()
@@ -200,6 +202,7 @@ class RatingDisplay(tk.Text):
 
     @log_class
     def set_mouseover_rating(self, event):
+        """ Set the rating based on the current position of the cursor """
         new_rating = self.get_mouseover_rating(event)
         self.set(self.enforce_bounds(new_rating))
 
@@ -276,6 +279,8 @@ class TitleModuleBase(tk.Frame):
 
     @log_class
     def set_text(self, **kwargs):
+        """ Update values in the title module widgets based on the given
+        kwargs """
         self._value_dict.update(kwargs)
         for kw in kwargs:
             if kw == "runtime":
@@ -311,6 +316,8 @@ class TitleModuleBase(tk.Frame):
 
     @log_class
     def format_runtime(self, runtime):
+        """ Convert a numeric runtime to 'Xh Ym' format
+        e.g. 100 to 1h 40m """
         try:
             return futil.format_time(int(runtime), "minutes")
         except ValueError:
@@ -318,6 +325,7 @@ class TitleModuleBase(tk.Frame):
 
     @log_class
     def format_date(self, date):
+        """ Format a date e.g. 2023-01-01 as 01 Jan 2023 """
         date = date[:10]
         return datetime.strptime(date, "%Y-%m-%d").strftime("%d %b %Y")
 
@@ -345,6 +353,7 @@ class TitleModule(tk.Frame):
         self.rating = RatingDisplay(
             self.rating_frame, font = font_rating, padx = 20
             )
+        # Map from number rating to colour of filled stars
         self.rating.set_colour_map(
             {1: "red", 2: "red", 3: "orange", 4: "orange", 5: "#ffbf00",
               6: "#ffbf00", 7: "lime green", 8: "lime green", 9: "forest green",
@@ -1248,11 +1257,13 @@ class HoverIconTag(HoverIcon):
                                       x_colour = "gray")),
             **kwargs)
 
-# test = "RatingDisplay"
-test = "TitleModule"
-# test = "FlexLabel"
+
 
 if __name__ == "__main__":
+    # test = "RatingDisplay"
+    test = "TitleModule"
+    # test = "FlexLabel"
+
     root = tk.Tk()
 
     if test == "RatingDisplay":
