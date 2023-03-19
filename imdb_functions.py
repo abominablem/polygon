@@ -292,7 +292,8 @@ class Title:
         if firstn > 0:
             people = people[:firstn]
 
-        names = [person.data['name'] for person in people]
+        names = [person.data['name'] for person in people
+                 if person.data.get('name', None) is not None]
         return names
 
     def __str__(self):
@@ -1101,5 +1102,4 @@ imdbf = IMDbFunctions()
 
 if __name__ == "__main__":
     pass
-    # imdbf.add_to_watchlist('tt1454029')
-    # imdbf.add_entry('tt0800080', {'platform': 'Download'}, rating = 6)
+    # imdbf.add_to_watchlist('tt9660502')
