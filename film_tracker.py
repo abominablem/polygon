@@ -65,6 +65,7 @@ class FilmTracker(tk.Frame):
             )
 
         self.last_range_change = datetime.min
+
         self.btn_deincrement = PolygonButton(
             self.header_frame, text = "⭠", command = self.deincrement,
             height = c.DM_FILM_HEADER_HEIGHT, width = 65, anchor = "center",
@@ -87,7 +88,8 @@ class FilmTracker(tk.Frame):
             )
 
         self.watchlist_icon = HoverIconPath(
-            self.header_frame, bg = c.COLOUR_FILM_BACKGROUND, dimensions = (90, 90),
+            self.header_frame, bg = c.COLOUR_FILM_BACKGROUND,
+            dimensions = (90, 90),
             standard = r".\common\watchlist_outlined.png",
             hover = r".\common\watchlist_outlined_hover.png"
             )
@@ -188,6 +190,8 @@ class FilmTracker(tk.Frame):
 
     @log_class
     def query_data(self):
+        """ Populate properties that contain data from the database. Update
+        relevant displays based on this data. """
         self.get_ranked_entries()
         self.get_film_counts()
         self.set_range_display_maximum()
@@ -196,6 +200,7 @@ class FilmTracker(tk.Frame):
 
     @log_class
     def set_counter(self):
+        """ Update counter depending on the button that has been selected """
         if self.btn_toggle_time.toggle_on:
             self.counter.set_counter(
                 format_time(self.total_runtime, unit = 'minutes',
@@ -209,7 +214,7 @@ class FilmTracker(tk.Frame):
     @log_class
     def get_ranked_entries(self):
         """ Get dictionary of all entries, ranked in decreasing order of
-        watch date """
+        watch date and watch order"""
         self.ranked_entries = imdbf.get_entry_by_rank(
             rank = None, type = "movie", rewatch = False
             )
