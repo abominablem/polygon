@@ -898,8 +898,11 @@ class OptionList(tk.Toplevel):
     @log_class
     def _enter(self, event = None):
         # set value as the first row
-        self.value = self.table.get_children()[0]
-        self.event_generate("<<SetValue>>")
+        if len(self.table.get_children()) > 0:
+            self.value = self.table.get_children()[0]
+            self.event_generate("<<SetValue>>")
+        else:
+            self.destroy()
 
     @log_class
     def _set_value(self, event):
