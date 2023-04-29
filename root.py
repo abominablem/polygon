@@ -58,7 +58,7 @@ class Polygon(tk.Tk):
             self.widget_frame, bg = c.COLOUR_FILM_BACKGROUND
             )
         self.tv_tracker = TvTracker(
-            self.widget_frame, bg = c.COLOUR_FILM_BACKGROUND
+            self.widget_frame, bg = c.COLOUR_FILM_BACKGROUND, pady = 30
             )
 
         self.icons["film"].bind(

@@ -566,7 +566,7 @@ class TvTracker(tk.Frame):
                       [1, 5, 9, 9],
                       [1, 6, 9, 9],
                       [1, 7, 9, 9],
-                      [1, 8, 9, 9],
+                      # [1, 8, 9, 9],
                       [1, -1, 9, 9]]
             )
         self.widget_set.grid(row = 0, column = 0, **c.GRID_STICKY, padx = (20, 40))
@@ -588,10 +588,6 @@ class TvTracker(tk.Frame):
             self.progress_bar.start_indeterminate()
             self.progress_bar.after(100, lambda: self._add_series(title))
             self.progress_bar.start()
-
-        self.title_id = title.title_id
-        self.update_table()
-        self.event_generate("<<SeriesChange>>")
 
     @log_class
     def _add_series(self, title):
@@ -615,6 +611,10 @@ class TvTracker(tk.Frame):
                 except imdb_functions.EpisodeExistsError:
                     pass
                 self.progress_bar.step(1)
+
+        self.title_id = title.title_id
+        self.update_table()
+        self.event_generate("<<SeriesChange>>")
 
     @log_class
     def confirm_tv_request(self, event = None):
