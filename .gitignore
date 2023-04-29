@@ -129,3 +129,4 @@ archive/tv_tracker v1.py
 *.iml
 *.json
 *.sql
+antioch/sqlite_db/transactions_test.db-journal
