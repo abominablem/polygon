@@ -280,8 +280,19 @@ class Title:
     def _get_original_title(self, year):
         """ Get the original title, based on the akas and release year """
         akas = self._data_get("akas", [])
-        original_title = (self._data_get("original title", self.title)
-                          if akas == [] or len(akas) == 0 else akas[0])
+        # list of potential titles, is order of priority
+        # fall back to the default title if no other titles available
+        titles = [
+            self._data_get("original title", None),
+            self._data_get("localized title", None),
+            None if akas == [] or len(akas) == 0 else akas[0],
+            self.title
+            ]
+        # take the first non-None value
+        original_title = next(
+            (title for title in titles if title is not None),
+            None
+            )
         return self._clean_original_title(original_title, year)
 
     @log_class
@@ -1102,4 +1113,5 @@ imdbf = IMDbFunctions()
 
 if __name__ == "__main__":
     pass
-    # imdbf.add_to_watchlist('tt9660502')
+    # imdbf.add_to_watchlist('tt21113540')
+    print(imdbf.get_title("tt1745960", refresh = True).original_title)
