@@ -34,7 +34,7 @@ def standardise_id(title_id):
 class Title:
     @log_class
     def __init__(self, title_id = None, detail = None, get_episodes = False):
-        self._get_episodes = False
+        self._get_episodes = get_episodes
         if not title_id is None:
             self.clear()
             movie = imdb.get_movie(clean_id(title_id))
@@ -1114,4 +1114,4 @@ imdbf = IMDbFunctions()
 if __name__ == "__main__":
     pass
     # imdbf.add_to_watchlist('tt21113540')
-    print(imdbf.get_title("tt1745960", refresh = True).original_title)
+    title = imdbf.get_title("tt4643084", refresh = True, get_episodes = True)
