@@ -81,21 +81,21 @@ class SeasonCounter(tk.Frame):
         return max(self.minimum, min(self.maximum, value))
 
     @log_class
-    def increment(self, *args, loop = True, **kwargs):
+    def increment(self, by = 1, loop = True, **kwargs):
         cur_val = self.get()
-        if cur_val + 1 > self.maximum and loop:
+        if cur_val + by > self.maximum and loop:
             self.set(self.minimum)
         else:
-            self.set(cur_val + 1)
+            self.set(cur_val + by)
         self.event_generate("<<SeasonChange>>")
 
     @log_class
-    def decrement(self, *args, loop = True, **kwargs):
+    def decrement(self, by = 1, loop = True, **kwargs):
         cur_val = self.get()
-        if cur_val - 1 < self.minimum and loop:
+        if cur_val - by < self.minimum and loop:
             self.set(self.maximum)
         else:
-            self.set(cur_val - 1)
+            self.set(cur_val - by)
         self.event_generate("<<SeasonChange>>")
 
 class CompletionTracker(base.TrimmedFrame):
@@ -739,16 +739,26 @@ class TvTracker(tk.Frame):
         self.series = self.get_series(title_id, refresh = refresh)
         season = self.season_display.get()
 
-        self.season_display.set_maximum(max(self.series.seasons))
-        self.season_display.set_minimum(min(self.series.seasons))
+        if len(self.series.seasons) == 0:
+            self.season_display.set_maximum(1)
+            self.season_display.set_minimum(1)
+        else:
+            self.season_display.set_maximum(max(self.series.seasons))
+            self.season_display.set_minimum(min(self.series.seasons))
 
         self.show_title.config(text = self.series.title)
         self.completion_tracker.update(self.series)
 
         try:
             episodes = self.series.seasons[season]
+        # season does not exist
         except KeyError:
-            episodes = self.series.seasons[list(self.series.seasons.keys())[0]]
+            # default to the first season
+            try:
+                episodes = self.series.seasons[list(self.series.seasons.keys())[0]]
+            # no seasons in database - use empty list
+            except IndexError:
+                episodes = []
 
         self.episode_table.add_episodes(episodes)
 
