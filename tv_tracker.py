@@ -190,6 +190,9 @@ class EpisodeTable(base.TrimmedFrame):
         if not isinstance(titles, list):
             titles = [titles]
 
+        # sort list of titles ascending order by episode number
+        titles.sort(key = lambda t: t.episode)
+
         children = self.table.get_children()
         for i, title in enumerate(titles):
             values = self.get_values(title)
