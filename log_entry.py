@@ -329,15 +329,19 @@ class TitleModuleEditable(TitleModule):
         self.tag_icon.bind("<1>", self._click_tag_icon)
         self.tag_icon.grid(row = 0, column = 2, **c.GRID_STICKY, padx = 20)
 
-        # frame for the tag images
-        self.tag_frame = tk.Frame(self.master, bg = c.COLOUR_TRANSPARENT)
-        self.tag_frame.grid(row = 1, column = 0, columnspan = c.COLUMNSPAN_ALL,
-                            **c.GRID_STICKY, padx = 10, pady = 10)
-
         self._tag_widgets = {}
         self.tags = {}
         self.tag_dicts = {}
         self._tag_count = 0
+        self._tag_row = 0
+        self._tag_col = 0
+        self.tag_frame_rows = []
+
+        # frame for the tag images
+        self.tag_frame = tk.Frame(self.master, bg = c.COLOUR_TRANSPARENT)
+        self.tag_frame.grid(row = 1, column = 0, columnspan = c.COLUMNSPAN_ALL,
+                            **c.GRID_STICKY, padx = 10, pady = 10)
+        self.add_tag_frame()
 
         # flag if there is a window open on top of the title module
         # useful to prevent events (e.g. clicks) from telegraphing to lower
@@ -456,24 +460,57 @@ class TitleModuleEditable(TitleModule):
 
     @log_class
     def add_tag_image(self, name, value):
-        """ Add a tag image below the window """
+        """ Add a tag image below the window, creating a new row if
+        necessary """
         if name is None:
             tag_string = value
         else:
             tag_string = f"{name}: {value}"
 
-        tag_col = self.get_tag_count()
+        tag_frame_row = self.tag_frame_rows[-1] # most recent (bottom) row of tags
 
         # create labels
         tag_widget = HoverIconTag(
-            self.tag_frame, bg = c.COLOUR_TRANSPARENT, value = tag_string,
+            tag_frame_row, bg = c.COLOUR_TRANSPARENT, value = tag_string,
             height = 60)
-        self._tag_widgets[tag_col] = tag_widget
 
-        tag_widget.grid(row = 0, column = tag_col)
+        cur_tag_frame_width = self.tag_frame.winfo_width()
+
+        tag_widget.grid(row = 0, column = self._tag_col)
+        # update widget positions after placing new tag
+        get_tk(self).update()
+
+        new_tag_frame_width = self.tag_frame.winfo_width()
+
+        """ If adding the tag pushes the frame width beyond the width of the
+        existing main tag frame, create a new row and move the tag there """
+        if new_tag_frame_width > cur_tag_frame_width:
+            self.add_tag_frame()
+            tag_frame_row = self.tag_frame_rows[-1]
+            self._tag_col = 0
+            tag_widget.destroy() # remove the old tag that's in the wrong row
+            tag_widget = HoverIconTag(
+                tag_frame_row, bg = c.COLOUR_TRANSPARENT, value = tag_string,
+                height = 60)
+            tag_widget.grid(row = 0, column = self._tag_col)
+
+        self._tag_col += 1
+
+        tag_count = self.get_tag_count()
+        self._tag_widgets[tag_count] = tag_widget
+
         tag_widget.bind(
-            "<ButtonRelease-1>", lambda *args: self._click_tag_widget(tag_col)
+            "<ButtonRelease-1>", lambda *args: self._click_tag_widget(tag_count)
             )
+
+    @log_class
+    def add_tag_frame(self):
+        """ Add a new tag row frame at the bottom of the master tag frame to
+        allow excessive tags to spill over onto multiple rows if needed """
+        tag_frame_row = tk.Frame(self.tag_frame, bg = c.COLOUR_TRANSPARENT)
+        tag_frame_row.grid(row = self._tag_row , column = 0, **c.GRID_STICKY)
+        self.tag_frame_rows.append(tag_frame_row)
+        self._tag_row += 1
 
     @log_class
     def _increment_tag_count(self):
