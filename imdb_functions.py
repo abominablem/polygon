@@ -544,12 +544,13 @@ class IMDbFunctions:
         """ Return a dictionary of values for use in a TitleModule widget
         based on the provided single or iterable of entry ranks """
         # filter to apply to the inner joined entries/titles table
-        inner_filters = [" entry_date IS NOT NULL"]
+        inner_filters = [" e.entry_date IS NOT NULL"]
         if type is None:
             pass
         elif type == "movie":
-            inner_filters.append("type IN ('%s')" % "', '".join(c.MOVIE_TYPES))
-            inner_filters.append("runtime >= 45")
+            inner_filters.append("t.type IN ('%s')" % "', '".join(c.MOVIE_TYPES))
+            inner_filters.append("t.runtime >= 45")
+            inner_filters.append("t.title_id NOT LIKE 'cc%'") # exclude custom titles
         else:
             raise ValueError("Invalid type")
 
@@ -1114,4 +1115,4 @@ imdbf = IMDbFunctions()
 if __name__ == "__main__":
     pass
     # imdbf.add_to_watchlist('tt21113540')
-    title = imdbf.get_title("tt4643084", refresh = True, get_episodes = True)
+    title = imdbf.get_title("tt4643084", refresh = True, get_episodes = True)    imdbf.add_to_watchlist('tt1865505')
