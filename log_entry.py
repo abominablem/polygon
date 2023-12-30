@@ -419,11 +419,19 @@ class TitleModuleEditable(TitleModule):
     def add_tag(self, name, value):
         """ Add a tag to the tag dictionary, and add a tag image below the
         window """
+        if self.tag_exists(name, value):
+            return
         self.add_tag_dict(name, value)
         self.add_tag_image(name, value)
         # the tag window grabs the set away from this one, so grab it back when
         # done
         self._increment_tag_count()
+
+    @log_class
+    def tag_exists(self, name, value):
+        """ Check if a given name + value pair already exists in the current
+        set of tags """
+        return name in self.tags and value in self.tags[name]
 
     @log_class
     def add_tag_dict(self, name, value):
