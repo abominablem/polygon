@@ -596,11 +596,12 @@ class TvTracker(tk.Frame):
     def _add_series(self, title):
         """ Download episodes and add them to the database """
         # Get a title object with imdbpy.Movie object embedded
+        title_id = title.title_id
         if not hasattr(title, '_title'):
-            title = imdbf.get_title(title.title_id, get_episodes = False,
+            title = imdbf.get_title(title_id, get_episodes = False,
                                     refresh = True)
         seasons = title.get_episodes(basic_only = True)
-        imdbf.add_title(title.title_id)
+        imdbf.add_title(title_id)
 
         num_episodes = sum([len(season) for season in seasons.values()])
         self.progress_bar.stop_indeterminate()
@@ -608,14 +609,14 @@ class TvTracker(tk.Frame):
 
         for season in seasons:
             for episode in seasons[season]:
-                title = seasons[season][episode]
+                episode_title = seasons[season][episode]
                 try:
-                    imdbf.add_title(title.title_id)
+                    imdbf.add_title(episode_title.title_id)
                 except imdb_functions.EpisodeExistsError:
                     pass
                 self.progress_bar.step(1)
 
-        self.title_id = title.title_id
+        self.title_id = title_id
         self.update_table()
         self.event_generate("<<SeriesChange>>")
 
