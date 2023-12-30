@@ -333,7 +333,10 @@ class TitleModuleEditable(TitleModule):
         self.tag_dicts = {}
         self._tag_count = 0
 
-        self.calendar_open = False
+        # flag if there is a window open on top of the title module
+        # useful to prevent events (e.g. clicks) from applying to the lower
+        # windows
+        self.window_open_above = False
 
     @log_class
     def get_values(self):
@@ -382,6 +385,7 @@ class TitleModuleEditable(TitleModule):
     @log_class
     def ask_tag(self, *args):
         """ Open an interface to select the tag name and value """
+        self.window_open_above = True
         self.tag_window = TagSelection(
             self.master, bg = c.COLOUR_TRANSPARENT)
         self.tag_window.lift()
@@ -459,7 +463,7 @@ class TitleModuleEditable(TitleModule):
     @log_class
     def _click_tag_widget(self, column):
         """ Remove widget on clicking tag """
-        if self.calendar_open:
+        if self.window_open_above:
             return
         self.after(100, lambda: self._tag_widgets[column].grid_forget())
         tag_dict = self.tag_dicts[column]
@@ -482,7 +486,7 @@ class TitleModuleEditable(TitleModule):
 
     @log_class
     def launch_calendar(self):
-        self.calendar_open = True
+        self.window_open_above = True
         self.calendar = EntryDateSelection(
             self.master, bg = c.COLOUR_FILM_BACKGROUND
             )
@@ -500,7 +504,7 @@ class TitleModuleEditable(TitleModule):
         # calendar is closed until shortly after it actually is. This prevents
         # accidentally removing tags from extra clicks
         def _make_calendar_none_(*args, **kwargs):
-            self.calendar_open = False
+            self.window_open_above = False
         self.after(1000, _make_calendar_none_)
 
     @log_class
