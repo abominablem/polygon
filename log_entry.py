@@ -113,6 +113,12 @@ class TagSelection(tk.Toplevel):
         self.mainloop()
 
     @log_class
+    def destroy(self, *args, **kwargs):
+        """ Overrides existing destroy func, to add event """
+        self.event_generate("<<Destroy>>")
+        super().destroy(*args, **kwargs)
+
+    @log_class
     def tag_name_change(self, *args):
         """ Called when the dropdown value for tag name changes """
         if self.tag_name.get() == self.tag_name_new:
@@ -334,7 +340,7 @@ class TitleModuleEditable(TitleModule):
         self._tag_count = 0
 
         # flag if there is a window open on top of the title module
-        # useful to prevent events (e.g. clicks) from applying to the lower
+        # useful to prevent events (e.g. clicks) from telegraphing to lower
         # windows
         self.window_open_above = False
 
@@ -397,8 +403,14 @@ class TitleModuleEditable(TitleModule):
             "<Shift-Return>",
             lambda *args, **kwargs: self.get_tag(get_from = "first_suggested")
             )
+        self.tag_window.bind("<<Destroy>>", self.ask_tag_exit)
         self.tag_window.bind("<<TickClick>>", self.get_tag)
         self.tag_window.start(position = self.get_tag_startup_position())
+
+    @log_class
+    def ask_tag_exit(self, *args, **kwargs):
+        """ To be called when a TagSelection window is destroyed """
+        self.window_open_above = False
 
     @log_class
     def get_tag_startup_position(self):
