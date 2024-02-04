@@ -747,8 +747,8 @@ class TvTracker(tk.Frame):
             self.season_display.set_maximum(1)
             self.season_display.set_minimum(1)
         else:
-            self.season_display.set_maximum(max(self.series.seasons))
             self.season_display.set_minimum(min(self.series.seasons))
+            self.season_display.set_maximum(max(self.series.seasons))
 
         self.show_title.config(text = self.series.title)
         self.completion_tracker.update(self.series)
