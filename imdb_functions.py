@@ -549,7 +549,7 @@ class IMDbFunctions:
             pass
         elif type == "movie":
             inner_filters.append("t.type IN ('%s')" % "', '".join(c.MOVIE_TYPES))
-            inner_filters.append("t.runtime >= 45")
+            inner_filters.append("t.runtime >= %s" % c.INT_FILM_MIN_LENGTH)
             inner_filters.append("t.title_id NOT LIKE 'cc%'") # exclude custom titles
         else:
             raise ValueError("Invalid type")
