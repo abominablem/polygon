@@ -801,7 +801,8 @@ class TvTracker(tk.Frame):
 
     @log_class
     def get_first_incomplete_season(self, series_id):
-        query = """ SELECT MIN(season) FROM episodes ep
+        query = """ SELECT MIN(IIF(TYPEOF(season) = "integer", season, 0))
+                    FROM episodes ep
                     LEFT JOIN entries e
                     ON ep.title_id = e.title_id
                     WHERE series_id = '%s' AND e.title_id IS NULL
