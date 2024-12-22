@@ -16,6 +16,8 @@ import base
 from mh_logging import log_class
 log_class = log_class(c.LOG_LEVEL)
 
+from imdb_episode_fetch import get_episodes_dict
+
 imdb = IMDb()
 
 def clean_id(title_id):
@@ -114,8 +116,12 @@ class Title:
         else:
             self.plot_tag = f.list_default(plot, 0, "").strip()
 
+    """
     @log_class
-    def get_episodes(self, basic_only = False):
+    def get_episodes_legacy(self, basic_only = False):
+        # replaced temporarily by self.get_episodes due to broken episodes
+        # parsing in the cinemagoer package meaning the episode list cannot
+        # be added to a series Title object
         if not self.type in c.TV_TYPES:
             raise WrongTitleTypeError(self.type)
 
@@ -133,6 +139,56 @@ class Title:
                 title = Title()
                 title.from_object(movie, update = not basic_only)
                 self.episodes[season][episode] = title
+        return self.episodes
+    """
+
+    @log_class
+    def get_episodes(self, basic_only = False):
+        if not self.type in c.TV_TYPES:
+            raise WrongTitleTypeError(self.type)
+
+        try:
+            self.update("episodes") #TODO
+        except AttributeError:
+            pass
+
+        # if self.update hasn't worked, use the fallback method
+        if len(self._data_get("episodes", {})) == 0:
+            self.episodes_mode = "fallback"
+            episodes_dict = get_episodes_dict(self.title_id)
+            self.episodes = episodes_dict
+            self.episodes = {}
+            for season in episodes_dict:
+                self.episodes[season] = {}
+                for episode in episodes_dict[season]:
+                    ep_dict = episodes_dict[season][episode]
+                    title = Title(
+                        title_id = None,
+                        detail = {
+                            "title_id": ep_dict["title_id"],
+                            "type": "episode",
+                            "episode": episode,
+                            "season": season,
+                            "title": ep_dict["title"],
+                            "release_date": self._clean_release_date(
+                                ep_dict["release_date"]
+                                )
+                            }
+                        )
+                    self.episodes[season][episode] = title
+
+        else:
+            self.episodes_mode = "automatic"
+            # Create dictionary of Title object for each season/episode
+            self.episodes = {}
+            for season in self._data_get("episodes", {}):
+                self.episodes[season] = {}
+                for episode in self._data["episodes"][season]:
+                    movie = self._data["episodes"][season][episode]
+                    title = Title()
+                    title.from_object(movie, update = not basic_only)
+                    self.episodes[season][episode] = title
+
         return self.episodes
 
     @log_class
