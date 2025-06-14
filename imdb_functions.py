@@ -7,23 +7,24 @@ Created on Wed Jan 12 20:21:02 2022
 import sys
 sys.path.append("D:\\Users\\Marcus\\Documents\\R Documents\\Coding\\Python\\Packages")
 import re
-from imdb import IMDb
-from datetime import datetime
+from cinemagoerng import web as imdb
 
 import constants as c
-import futil as f
 import base
 from mh_logging import log_class
 log_class = log_class(c.LOG_LEVEL)
 
-from imdb_episode_fetch import get_episodes_dict
+import imdb_episode_fetch as fetch
 
-imdb = IMDb()
-
-def clean_id(title_id):
+def clean_id(title_id: str) -> str:
     """ Remove all non-numeric characters from the id, including
     leading "tt" """
-    return re.sub("[^\d]", "", title_id)
+    if re.match(r"\d+", title_id):
+        return "tt" + title_id
+    elif re.match(r"tt\d+", title_id):
+        return title_id
+    else:
+        raise ValueError("Unrecognised IMDb id '%s'" % title_id)
 
 def standardise_id(title_id):
     """ Standardise the given id with leading "tt" """
@@ -39,7 +40,7 @@ class Title:
         self._get_episodes = get_episodes
         if not title_id is None:
             self.clear()
-            movie = imdb.get_movie(clean_id(title_id))
+            movie = imdb.get_title(clean_id(title_id), page = "main")
             self._data_from_object(movie)
 
         if not detail is None:
@@ -50,7 +51,8 @@ class Title:
         """ Update object based on latest IMDb data """
         self.clear()
         if detail is None:
-            self._data_from_object(imdb.get_movie(clean_id(self.title_id)))
+            self._data_from_object(
+                imdb.get_title(clean_id(self.title_id), page = "main"))
         else:
             self.__dict__.update(detail)
 
@@ -61,140 +63,106 @@ class Title:
 
     @log_class
     def _data_from_object(self, movie, update = True):
-        self.title_id = standardise_id(movie.getID())
+        self.title_id = standardise_id(movie.imdb_id)
 
         if update:
-            imdb.update(movie, ["akas", "main"])
+            imdb.update_title(movie, page = "akas", keys = ["akas"])
 
         self._title = movie
-        self._data = self._title.data
 
-        self.type = self._data.get("kind", "movie")
+        self.type = getattr(self._title, "type_id", "movie")
+
+        # cinemagoerng uses slightly different type IDs, so map back to the
+        # original set already used in the database
+        self.type = {
+            "tvSeries": "tv series",
+            "tvMovie": "tv movie",
+            "tvSpecial": "tv special",
+            "tvMiniSeries": "tv mini series",
+            "tvEpisode": "episode",
+            }.get(self.type, self.type)
 
         if self.type in c.EPISODE_TYPES:
-            self.series_id = standardise_id(self._data["episode of"].getID())
-            self.episode = self._data["episode"]
-            self.season = self._data["season"]
+            self.series_id = standardise_id(self._title.series.imdb_id)
+            self.series_title = self._title.series.title
+            self.series_year_start = self._title.series.year
+            self.series_year_end = self._title.series.end_year
+            self.episode = self._title.episode
+            self.season = self._title.season
 
         elif self.type in c.TV_TYPES:
             self.series_id = self.title_id
+            self.series_title = self.title
+            self.series_year_start = self._title.year
+            self.series_year_end = self._title.end_year
             if self._get_episodes:
                 self.get_episodes()
 
-        self.title = self._data["title"]
-        self.year = self._data_get("year", None)
-        self.original_title = self._get_original_title(self.year)
-        self.release_date = self._clean_release_date(
-            self._data.get("original air date", None)
-            )
+        self.title = self._title.title
+        self.year = self._title.year
+        self.original_title = getattr(self._title, "original_title", self.title)
+
+        self.release_date = None
+        if getattr(self._title, "release_date", None) is not None:
+            self.release_date = self._title.release_date.isoformat()
 
         # private lists for use in get_tags
         # note tv series do not have directors (but episodes do)
-        self._directors = self._get_names(self._data.get("director", []))
-        self._genres = self._data.get("genres", [])
-        self._writers = self._get_names(self._data.get("writer", []))
+        self._directors = self._get_names(self._title.directors)
+        self._genres = self._title.genres
+        self._writers = self._get_names(self._title.writers)
 
         self.director = ", ".join(self._directors)
         self.genre = ", ".join(self._genres)
         self.writer = ", ".join(self._writers)
 
-        rating = self._data_get("rating", None)
-        if rating is None:
-            self.imdb_user_rating = rating
-        else:
-            self.imdb_user_rating = round(rating, 1)
+        self.imdb_user_rating = None
+        if getattr(self._title, "rating", None) is not None:
+            self.imdb_user_rating = float(self._title.rating)
 
-        self.imdb_user_votes = self._data_get("votes", 0)
+        self.imdb_user_votes = self._title.vote_count
 
-        self.runtime = f.list_default(
-            self._data_get("runtimes", []), 0, None
-            )
+        self.runtime = self._title.runtime
 
-        plot = self._data_get("plot", [])
-        if isinstance(plot, str):
-            self.plot_tag = plot.strip()
-        else:
-            self.plot_tag = f.list_default(plot, 0, "").strip()
+        self.plot_tag = self._title.plot.get(
+            'en-US', self._title.plot.get('en-GB', None))
 
-    """
-    @log_class
-    def get_episodes_legacy(self, basic_only = False):
-        # replaced temporarily by self.get_episodes due to broken episodes
-        # parsing in the cinemagoer package meaning the episode list cannot
-        # be added to a series Title object
-        if not self.type in c.TV_TYPES:
-            raise WrongTitleTypeError(self.type)
-
-        try:
-            self.update("episodes")
-        except AttributeError:
-            pass
-
-        # Create dictionary of Title object for each season/episode
-        self.episodes = {}
-        for season in self._data_get("episodes", {}):
-            self.episodes[season] = {}
-            for episode in self._data["episodes"][season]:
-                movie = self._data["episodes"][season][episode]
-                title = Title()
-                title.from_object(movie, update = not basic_only)
-                self.episodes[season][episode] = title
-        return self.episodes
-    """
 
     @log_class
     def get_episodes(self, basic_only = False):
         if not self.type in c.TV_TYPES:
             raise WrongTitleTypeError(self.type)
 
-        try:
-            self.update("episodes") #TODO
-        except AttributeError:
-            pass
+        # Note - not currently enabled, as specific seasons must be specified
+        # but there is no mechanism to fetch a list of seasons built into
+        # cinemagoerng
+        # imdb.update_title(self._title, page = "episodes", keys = ["episodes"])
 
-        # if self.update hasn't worked, use the fallback method
-        if len(self._data_get("episodes", {})) == 0:
-            self.episodes_mode = "fallback"
-            episodes_dict = get_episodes_dict(self.title_id)
-            self.episodes = episodes_dict
-            self.episodes = {}
-            for season in episodes_dict:
-                self.episodes[season] = {}
-                for episode in episodes_dict[season]:
-                    ep_dict = episodes_dict[season][episode]
-                    title = Title(
-                        title_id = None,
-                        detail = {
-                            "title_id": ep_dict["title_id"],
-                            "type": "episode",
-                            "episode": episode,
-                            "season": season,
-                            "title": ep_dict["title"],
-                            "release_date": self._clean_release_date(
-                                ep_dict["release_date"]
-                                )
-                            }
-                        )
-                    self.episodes[season][episode] = title
+        seasons = fetch.get_seasons_dict(self.title_id)
+        for season in seasons.keys():
+            imdb.update_title(
+                self._title, page = "episodes", keys = ["episodes"],
+                season = season
+                )
 
-        else:
-            self.episodes_mode = "automatic"
-            # Create dictionary of Title object for each season/episode
-            self.episodes = {}
-            for season in self._data_get("episodes", {}):
-                self.episodes[season] = {}
-                for episode in self._data["episodes"][season]:
-                    movie = self._data["episodes"][season][episode]
-                    title = Title()
-                    title.from_object(movie, update = not basic_only)
-                    self.episodes[season][episode] = title
-
+        # convert TVEpisode objects in Title objects
+        self.episodes = {}
+        for season in self._title.episodes.keys():
+            self.episodes[season] = {}
+            for episode in self._title.episodes[season]:
+                movie = self._title.episodes[season][episode]
+                # The current series object will be more detailed than the one
+                # attached to each episode by default - so replace it
+                movie.series = self._title
+                title = Title()
+                title.from_object(movie, update = not basic_only)
+                self.episodes[season][episode] = title
         return self.episodes
 
     @log_class
     def update(self, type):
         if hasattr(self, "_title"):
-            imdb.update(self._title, type)
+            imdb.update_title(self._title, page = type, keys = [type])
         else:
             raise AttributeError("Title has no _title imdb.Movie attribute")
 
@@ -225,8 +193,9 @@ class Title:
 
     @log_class
     def _data_get(self, key, default):
-        """ Get data from imdb.Title.data object """
-        return self._data.get(key, default)
+        """ Get data from imdb.title object attribute, with fallback to
+        default value """
+        return getattr(self._title, key, default)
 
     def _get_type(self):
         if self.type in c.MOVIE_TYPES:
@@ -265,7 +234,7 @@ class Title:
 
     @log_class
     def _get_dict(self, keys):
-        return {key: self.__dict__[key] for key in keys}
+        return {key: getattr(self, key) for key in keys}
 
     @log_class
     def get_tags(self, type = None):
@@ -290,26 +259,6 @@ class Title:
             raise ValueError("Unrecognised title type")
 
     @log_class
-    def _clean_release_date(self, release_date):
-        """ Parse dates of the form e.g. 12 Mar. 2020 """
-        if release_date is None: return
-        try:
-            # extract the relevant bits (day/month/year) flexibly
-            match_date = re.match(
-                "^(?P<day>\d{1,2})\s(?P<month>[a-zA-Z]{3})\.?\s(?P<year>\d{4}).*$",
-                release_date
-                )
-            # place into a consistent format for strptime
-            parsed_date = datetime.strptime(
-                "%s %s %s" % match_date.groups(),
-                "%d %b %Y"
-                )
-            release_date = parsed_date.strftime("%Y-%m-%d")
-        except: #TODO work out exact error if it can't parse
-            pass
-        return release_date
-
-    @log_class
     def get_series(self, get_episodes = False):
         """ Return Title object of parent series """
         if self.type == "episode":
@@ -320,38 +269,6 @@ class Title:
             raise WrongTitleTypeError(self.type)
 
     @log_class
-    def _clean_original_title(self, original_title, year):
-        """ Remove ' (XXXX)' from the end of the title where XXXX is the
-        release year """
-        if year is None:
-            return original_title
-        elif original_title[-7:] == " (%s)" % year:
-            return original_title[:-7]
-        elif original_title[-17:] == " (original title)":
-            return original_title[:-17]
-        else:
-            return original_title
-
-    @log_class
-    def _get_original_title(self, year):
-        """ Get the original title, based on the akas and release year """
-        akas = self._data_get("akas", [])
-        # list of potential titles, is order of priority
-        # fall back to the default title if no other titles available
-        titles = [
-            self._data_get("original title", None),
-            self._data_get("localized title", None),
-            None if akas == [] or len(akas) == 0 else akas[0],
-            self.title
-            ]
-        # take the first non-None value
-        original_title = next(
-            (title for title in titles if title is not None),
-            None
-            )
-        return self._clean_original_title(original_title, year)
-
-    @log_class
     def _get_names(self, people, firstn = 0):
         if not isinstance(people, list):
             people = [people]
@@ -359,8 +276,7 @@ class Title:
         if firstn > 0:
             people = people[:firstn]
 
-        names = [person.data['name'] for person in people
-                 if person.data.get('name', None) is not None]
+        names = [person.name for person in people if hasattr(person, 'name')]
         return names
 
     def __str__(self):
@@ -370,37 +286,24 @@ class Title:
                 season = "??" if self.season == 'unknown' else self.season
                 episode = "??" if self.episode == 'unknown' else self.episode
                 return "<%s : %s : %s S%sE%s %s (%s)>" % (
-                    self.title_id, self.type,
-                    self._data["episode of"].get("title"), season, episode,
-                    self.title, date
+                    self.title_id, self.type, self.series_title, season,
+                    episode, self.title, date
                     )
             elif self.type == "series":
-                return "<%s : %s : %s (%s)>" % (
-                    self.title_id, self.type, self.title,
-                    self._data_get("series years", "??")
+                start_year = self.series_year_start or ""
+                end_year = self.series_year_end or ""
+                return "<%s : %s : %s (%s–%s)>" % (
+                    self.title_id, self.type, self.title, start_year, end_year
                     )
             else:
                 year = "??" if self.year is None else self.year
                 return "<%s : %s : %s (%s)>" % (
                     self.title_id, self.type, self.title, year
                     )
-        except AttributeError:
-            if self.type == "episode":
-                date = "??" if self.release_date is None else self.release_date
-                return "<%s : %s : %s S%sE%s %s (%s)>" % (
-                    self.title_id, self.type, "<unknown>", "??",
-                    "??", self.title, date
-                    )
-            elif self.type == "series":
-                return "<%s : %s : %s (%s)>" % (
-                    self.title_id, self.type, self.title,
-                    self._data_get("series years", "??")
-                    )
-            else:
-                year = "??" if self.year is None else self.year
-                return "<%s : %s : %s (%s)>" % (
-                    self.title_id, self.type, self.title, year
-                    )
+        except:
+            return "<%s : %s : %s>" % (
+                self.title_id, self.type, self.title
+                )
 
     __repr__ = __str__
 
@@ -1170,5 +1073,7 @@ imdbf = IMDbFunctions()
 
 if __name__ == "__main__":
     pass
-    # imdbf.add_to_watchlist('tt21113540')
-    title = imdbf.get_title("tt4643084", refresh = True, get_episodes = True)    imdbf.add_to_watchlist('tt1865505')
+    title = imdbf.get_title("tt30255432", refresh=True)
+    # imdbf.add_to_watchlist('tt1312221')
+    # imdbf.add_title("tt32678760")
+    # imdbf.add_entry("tt0609853", tags = {})
