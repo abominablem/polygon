@@ -6,7 +6,16 @@ Created on Sat Feb  5 23:30:08 2022
 """
 from PIL import Image, ImageDraw, ImageFont
 import sys
+import math
 sys.path.append("D:\\Users\\Marcus\\Documents\\R Documents\\Coding\\Python\\Packages")
+
+def font_getsize(font, text):
+    bbox_text = font.getbbox(text)
+    text_width = bbox_text[2] - bbox_text[0]
+    text_height = bbox_text[3] - bbox_text[1]
+
+    return text_width, text_height
+
 
 def circle(draw, center, radius, fill):
     coords = (center[0] - radius + 1, center[1] - radius + 1,
@@ -23,11 +32,7 @@ def tag(width, height, fill = "black", line_width = 15,
     """ Return an image of a tag shaped object """
     # assert width >= height * 3
 
-    offset = line_width / 2
-    if offset != int(offset):
-        offset = int(offset) + 1
-    else:
-        offset = int(offset)
+    offset = math.ceil(line_width / 2)
     half_height = int(height / 2)
 
     true_width = width + offset
@@ -37,7 +42,7 @@ def tag(width, height, fill = "black", line_width = 15,
     draw = ImageDraw.Draw(canvas)
 
     """ Draw the interior shading """
-    draw.rectangle(((half_height, height), (width, offset)), fill = interior)
+    draw.rectangle(((half_height, offset), (width, height)), fill = interior)
     draw.polygon(((offset, half_height), (half_height, height),
                   (half_height, offset)), fill = interior)
 
@@ -62,18 +67,19 @@ def _text_tag(text, text_colour = "black", x_colour = "black", fill = "black",
     """ Return an image of a tag shaped object containing a given text string
     and X """
     font = ImageFont.truetype("arial.ttf", size = 150)
-    text_width, text_height = font.getsize(text)
-    height = int(text_height * 1.6)
+    text_width, text_height = font_getsize(font, text)
+
+    height = int(text_height * 1.8)
     circle_edge_x = int(height * 13/12)
     text_padding_x = int(height * 1/6)
     text_x = height
-    text_y = int(height/2 - text_height/2)
+    text_y = int(height/2 - text_height/2*1.25)
 
     remove_tag_text = "×"
     font_remove = ImageFont.truetype("arial.ttf", size = 250)
-    text_remove_width, text_remove_height = font_remove.getsize(remove_tag_text)
+    text_remove_width, text_remove_height = font_getsize(font_remove, remove_tag_text)
     text_remove_x = circle_edge_x + text_padding_x + text_width
-    text_remove_y = int(height/2 - text_remove_height/2*1.2)
+    text_remove_y = int(height/2 - text_remove_height/2*1.9)
 
 
     width = (height + text_width + text_padding_x + text_remove_width
@@ -94,7 +100,7 @@ def text_tag(text, height = 300, dimensions = False, **kwargs):
     img_width, img_height = image.size
     aspect = img_width / img_height
     width = int(height * aspect)
-    image = image.resize((width, height), resample = Image.ANTIALIAS)
+    image = image.resize((width, height), resample = Image.Resampling.LANCZOS)
     image = force_opacity(image)
     if dimensions:
         return (image, width, height)
@@ -123,7 +129,7 @@ def tick_image(height, colour = "black", background = (0, 0, 0, 0),
     rounded_line(draw, ((200, 600, 400, 800)), fill = colour, width = 150)
     rounded_line(draw, ((400, 800, 800, 200)), fill = colour, width = 150)
 
-    image = image.resize((height, height), resample = Image.NEAREST)
+    image = image.resize((height, height), resample = Image.Resampling.NEAREST)
     image = force_opacity(image)
     return image
 
