@@ -38,7 +38,7 @@ MAX_REFRESH_FREQUENCY_SECONDS = 0.15
 """ GLOBAL VARS """
 LOG_LEVEL = "min"
 DEBUG = False
-LOGO_PATH = ".\common\logo.png"
+LOGO_PATH = r".\common\logo.png"
 
 """ FONTS """
 FONT_MAIN_TITLE = ("Constantia", 32, "bold")
