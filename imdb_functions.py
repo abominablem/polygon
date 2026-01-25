@@ -7,6 +7,7 @@ Created on Wed Jan 12 20:21:02 2022
 import sys
 sys.path.append("D:\\Users\\Marcus\\Documents\\R Documents\\Coding\\Python\\Packages")
 import re
+from datetime import datetime
 from cinemagoerng import web as imdb
 
 import constants as c
