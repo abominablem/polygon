@@ -15,7 +15,7 @@ from mh_logging import log_class
 import tk_arrange as tka
 import constants as c
 from futil import get_tk, format_time
-from imdb_functions import imdbf
+from imdb_functions import (imdbf, TitleExistsError)
 from base import WidgetCollection
 from widgets import (TitleModule, Counter, Padding, RangeDisplay, PolygonButton,
                      RequestTitleWindow, HoverIconPath, TitleModuleDetailed)
@@ -395,7 +395,31 @@ class FilmTracker(tk.Frame):
 
     @log_class
     def _click_watchlist_icon(self, *args, **kwargs):
-        self.set_titlemod_mode("watchlist")
+        """ Open a search window to add a watchlist entry """
+        # self.set_titlemod_mode("watchlist")
+        self.film_request = RequestTitleWindow(self)
+        self.film_request.bind("<<SetValue>>", self.add_entry_to_watchlist)
+        self.film_request.bind("<<Destroy>>", self.undim)
+        self.dim(transparency = 0.7)
+        self.film_request.start()
+
+    def add_entry_to_watchlist(self, event = None):
+        title_id = self.film_request.get_value()
+        self.film_request.destroy()
+
+        # if the title doesn't exist on the watchlist, add it. Otherwise,
+        # remove it (after confirming with the user)
+        try:
+            imdbf.add_to_watchlist(title_id)
+
+        except TitleExistsError:
+            ask_remove = tk.messagebox.askyesno(
+                "Title already on watchlist",
+                "The selected title is already on your watchlist. Would you "
+                "like to remove it?"
+                )
+            if ask_remove: imdbf.watchlist.remove(title_id)
+
 
 if __name__ == "__main__":
     root = tk.Tk()

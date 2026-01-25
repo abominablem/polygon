@@ -1058,12 +1058,34 @@ class IMDbWatchlistFunctions(IMDbBaseTitleFunctions):
         self.titles_db = base.polygon_db.titles
 
     @log_class
-    def add(self, title_id, **kwargs):
+    def exists_id(self, title_id):
+        """ Return if title_id exists in database - and is not marked as
+        removed """
+        title_id = standardise_id(title_id)
+        result = self.db.filter(
+            {"title_id": title_id, "removed_date": None},
+            "title_id"
+            )
+        return len(result["title_id"]) != 0
+
+    @log_class
+    def add(self, title_id):
         """ Insert a title to the database if it does not already exist """
         title_id = standardise_id(title_id)
         if self.exists(title_id):
             raise TitleExistsError("Title is already on the watchlist")
-        self.db.insert(title_id = title_id, **kwargs)
+        self.db.insert(title_id = title_id)
+
+    @log_class
+    def remove(self, title_id):
+        """ Mark an existing title in the database as removed """
+        title_id = standardise_id(title_id)
+        if not self.exists(title_id):
+            raise TitleNotExistsError("Title is not on the watchlist")
+        self.db.update(
+            filters = {"title_id": title_id},
+            removed_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            )
 
     @log_class
     def get(self, *args, **kwargs):
